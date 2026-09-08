@@ -1,11 +1,11 @@
 # Detecção de Vazamento de Dados via SQL
 
 ## Sobre o Projeto
-Este é um Produto Mínimo Viável (MVP) desenvolvido para a disciplina de Gestão Ágil de Projetos da Pontifícia Universidade Católica de São Paulo (PUC-SP). O sistema atua como um monitor de segurança corporativa para bancos de dados relacionais, focando na identificação de acessos suspeitos e na prevenção contra a exfiltração de dados sensíveis[cite: 11].
+Este é um Produto Mínimo Viável (MVP) desenvolvido para a disciplina de Gestão Ágil de Projetos da Pontifícia Universidade Católica de São Paulo (PUC-SP). O sistema atua como um monitor de segurança corporativa para bancos de dados relacionais, focando na identificação de acessos suspeitos e na prevenção contra a exfiltração de dados sensíveis.
 
 O projeto opera em duas frentes principais:
 1. **Proteção de Dados (Prevenção):** Implementação de criptografia forte (AES-256-GCM) para dados confidenciais e hashes seguros (bcrypt) para senhas antes da persistência no banco.
-2. **Monitoramento e Auditoria (Detecção):** Utilização de consultas SQL táticas (focadas em segurança defensiva / Blue Team) aplicadas sobre uma trilha de auditoria contínua para flagrar anomalias como ataques de força bruta, escalação de privilégios e acessos simultâneos irregulares[cite: 10, 11].
+2. **Monitoramento e Auditoria (Detecção):** Utilização de consultas SQL táticas (focadas em segurança defensiva / Blue Team) aplicadas sobre uma trilha de auditoria contínua para flagrar anomalias como ataques de força bruta, escalação de privilégios e acessos simultâneos irregulares.
 
 ## Equipe e Gestão Ágil (Scrum)
 O desenvolvimento deste MVP foi guiado pelos princípios da metodologia ágil, com as entregas divididas em Sprints e a seguinte distribuição de papéis:
