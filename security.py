@@ -12,10 +12,10 @@ except ModuleNotFoundError as exc:
         "Instale a dependência 'cryptography' para usar AES-GCM."
     ) from exc
 
-# Chave AES em base64. A variável de ambiente AES_KEY é usada quando disponível.
-# Caso contrário, gera uma chave aleatória em tempo de execução, o que não é ideal
-# em produção, mas é suficiente para ambiente de demonstração.
-CHAVE_AES_B64 = os.environ.get("AES_KEY", base64.b64encode(os.urandom(32)).decode('utf-8'))
+# Chave AES em base64 fixa para ambiente de testes, garantindo que os dados
+# criptografados em uma execução (ex: fillBank.py) possam ser lidos em
+# outra (ex: auth_demo.py). Em produção, SEMPRE use variáveis de ambiente.
+CHAVE_AES_B64 = os.environ.get("AES_KEY", "uO1QeB3hXvR9yP5sF7jW2zK4mN8cV6bA0xL5qZ3rE9g=")
 
 # Criptografa uma string em texto claro usando AES-GCM.
 # O nonce é gerado aleatoriamente para cada chamada e precisa ser preservado

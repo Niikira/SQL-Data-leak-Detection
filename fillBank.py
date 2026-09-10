@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine, inspect, text
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import sessionmaker
 from criarTabelas import Base, User, AuthLog
 from security import criptografar_dado
