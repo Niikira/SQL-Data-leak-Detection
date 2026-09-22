@@ -1,0 +1,80 @@
+.page { display: flex; flex-direction: column; gap: 20px; }
+
+/* Cards grid */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.userCard { display: flex; flex-direction: column; gap: 14px; }
+
+.userHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.userIcon { font-size: 28px; flex-shrink: 0; }
+.userInfo { display: flex; flex-direction: column; gap: 2px; }
+.userName { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.userRole  { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
+
+/* Stat rows */
+.userStats { display: flex; flex-direction: column; gap: 6px; }
+.statRow   { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.statIcon  { width: 16px; text-align: center; flex-shrink: 0; }
+.statLabel { color: var(--text-secondary); flex: 1; }
+.statValue { color: var(--text-primary); font-weight: 600; }
+
+/* Countdown */
+.countdownWrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+.countdownLabel { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
+
+.countdown {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--sev-med);
+}
+.countdown.urgent  { color: var(--sev-high); animation: blink 1s step-end infinite; }
+.countdown.expired { color: var(--text-muted); }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* Progress */
+.progressWrap { display: flex; flex-direction: column; gap: 4px; }
+.progressBar  {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--sev-high) 0%, var(--sev-med) 100%);
+  border-radius: 3px;
+  transition: width 1s linear;
+}
+.progressLabel { font-size: 10px; color: var(--text-muted); text-align: right; }
+
+/* Table card */
+.tableCard {}
+.tableTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 14px;
+}

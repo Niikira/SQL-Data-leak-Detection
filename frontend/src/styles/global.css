@@ -1,0 +1,166 @@
+/* ── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Palette */
+  --bg-base:      #0d1117;
+  --bg-surface:   #161b22;
+  --bg-elevated:  #1f2937;
+  --border:       #30363d;
+
+  --text-primary:   #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted:     #484f58;
+
+  /* Severity */
+  --sev-high:    #ef4444;
+  --sev-high-bg: rgba(239, 68, 68, 0.12);
+  --sev-med:     #f59e0b;
+  --sev-med-bg:  rgba(245, 158, 11, 0.12);
+  --sev-low:     #3b82f6;
+  --sev-low-bg:  rgba(59, 130, 246, 0.12);
+
+  /* Brand accent */
+  --accent:      #58a6ff;
+  --accent-dim:  rgba(88, 166, 255, 0.15);
+
+  /* Chart colors */
+  --chart-high:  #ef4444;
+  --chart-med:   #f59e0b;
+  --chart-low:   #3b82f6;
+  --chart-ok:    #22c55e;
+
+  --sidebar-w: 220px;
+  --header-h:  56px;
+
+  font-size: 14px;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: inherit; }
+input, select { font-family: inherit; }
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Severity badge ───────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.badge-ALTA  { background: var(--sev-high-bg); color: var(--sev-high); border: 1px solid var(--sev-high); }
+.badge-MÉDIA { background: var(--sev-med-bg);  color: var(--sev-med);  border: 1px solid var(--sev-med); }
+.badge-BAIXA { background: var(--sev-low-bg);  color: var(--sev-low);  border: 1px solid var(--sev-low); }
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+/* ── Page header ──────────────────────────────────────────────────────────── */
+.page-header {
+  margin-bottom: 24px;
+}
+.page-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.page-header p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+/* ── Table ────────────────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+thead th {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: .06em;
+  font-weight: 600;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+thead th.sortable { cursor: pointer; user-select: none; }
+thead th.sortable:hover { color: var(--text-primary); }
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--bg-elevated); }
+tbody td {
+  padding: 10px 14px;
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+.td-muted { color: var(--text-secondary); font-size: 12px; }
+.td-mono  { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; }
+
+/* ── Form controls ────────────────────────────────────────────────────────── */
+.ctrl-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.input-field, .select-field {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 7px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input-field:focus, .select-field:focus {
+  border-color: var(--accent);
+}
+.input-field { min-width: 200px; }
+.select-field option { background: var(--bg-elevated); }
+
+.btn {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn:hover { background: rgba(88, 166, 255, 0.25); }

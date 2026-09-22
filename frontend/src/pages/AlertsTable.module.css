@@ -1,0 +1,31 @@
+.page { display: flex; flex-direction: column; }
+
+.detailCell {
+  max-width: 380px;
+  white-space: normal;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.typeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+/* Per-type accent colors */
+.type_SQL_INJECTION   { color: var(--sev-high); }
+.type_BRUTE_FORCE     { color: var(--sev-high); }
+.type_LATERAL_MOVEMENT{ color: var(--sev-high); }
+.type_PRIV_ESCALATION { color: var(--sev-high); }
+.type_DATA_EXPORT     { color: var(--sev-med); }
+.type_TOKEN_ENUM      { color: var(--sev-med); }
+.type_ACCOUNT_LOCKOUT { color: var(--sev-med); }
+.type_PASSWORD_SPRAY  { color: var(--sev-high); }
+.type_WEAK_HASH       { color: var(--sev-high); }
+.type_OFF_HOURS       { color: var(--sev-low); }
+.type_SHORT_TOTP      { color: var(--sev-med); }

@@ -1,0 +1,166 @@
+.page { display: flex; flex-direction: column; gap: 20px; }
+
+/* Search */
+.searchForm {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.inputWrap { position: relative; flex: 1; min-width: 260px; }
+.ipInput   { width: 100%; font-family: 'JetBrains Mono', monospace; }
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  list-style: none;
+  z-index: 10;
+  overflow: hidden;
+}
+.suggestions li {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-family: monospace;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.1s;
+}
+.suggestions li:hover { background: var(--bg-surface); color: var(--accent); }
+
+/* Hint */
+.hintBox {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hintTitle { font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.hintChips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-family: monospace;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.chip:hover { background: var(--accent-dim); border-color: var(--accent); }
+
+/* IP summary */
+.ipSummary { display: flex; flex-direction: column; gap: 12px; }
+.ipTitle   { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ipAddr    { font-size: 18px; font-weight: 700; font-family: monospace; color: var(--accent); }
+.ipTotal   { font-size: 12px; color: var(--text-secondary); }
+
+.countChips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.typeChip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--chip-color, var(--text-secondary));
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.typeChip:hover, .typeChipActive {
+  background: color-mix(in srgb, var(--chip-color) 15%, transparent);
+  border-color: var(--chip-color);
+}
+.clearFilter {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.clearFilter:hover { color: var(--text-secondary); }
+
+/* Timeline */
+.timeline { display: flex; flex-direction: column; }
+
+.timelineItem {
+  display: flex;
+  gap: 0;
+}
+
+.lineCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  flex-shrink: 0;
+  padding-top: 14px;
+}
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.line {
+  width: 2px;
+  flex: 1;
+  min-height: 16px;
+  background: var(--border);
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.eventCard {
+  flex: 1;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+}
+
+.eventHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.eventIcon { font-size: 16px; }
+.eventType { font-size: 13px; font-weight: 700; }
+.eventTs   { margin-left: auto; font-size: 11px; color: var(--text-muted); font-family: monospace; }
+
+.eventBody { display: flex; flex-direction: column; gap: 4px; }
+.evField   { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
+.evFieldIcon  { font-size: 11px; }
+.evFieldLabel { color: var(--text-muted); min-width: 56px; }
+.evFieldValue { color: var(--text-primary); }
+
+/* End */
+.timelineEnd {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 10px 0 4px;
+  letter-spacing: .04em;
+}
+
+.empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}

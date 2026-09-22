@@ -1,0 +1,40 @@
+.page { display: flex; flex-direction: column; gap: 20px; }
+
+/* Banner */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: var(--sev-high-bg);
+  border: 1px solid var(--sev-high);
+  border-radius: 8px;
+  padding: 14px 18px;
+  color: var(--text-primary);
+}
+.bannerIcon { font-size: 22px; flex-shrink: 0; }
+.banner strong { font-size: 14px; font-weight: 700; color: var(--sev-high); }
+.banner p { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* Chart */
+.chartCard { padding: 20px; }
+.cardTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 16px;
+}
+
+/* Tooltip */
+.tooltip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.7;
+}
+.tooltipTitle { font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+.tooltipWarn  { color: var(--sev-med); font-size: 11px; margin-top: 4px; }
