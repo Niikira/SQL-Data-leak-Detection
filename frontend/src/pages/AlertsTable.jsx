@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { MOCK_ALERTS } from '../data/mockData'
 import styles from './AlertsTable.module.css'
 
@@ -26,8 +26,29 @@ export default function AlertsTable() {
   const [sortKey, setSortKey]       = useState('timestamp')
   const [sortDir, setSortDir]       = useState('desc')
 
+  const [alerts, setAlerts]   = useState(MOCK_ALERTS)
+  const [isMock, setIsMock]   = useState(true)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelado = false
+    fetch('/api/alerts')
+      .then((r) => { if (!r.ok) throw new Error('API respondeu ' + r.status); return r.json() })
+      .then((data) => {
+        if (cancelado) return
+        setAlerts(data)
+        setIsMock(false)
+      })
+      .catch(() => {
+        // API fora do ar: mantém os dados mockados para a tela não ficar vazia.
+        if (!cancelado) setIsMock(true)
+      })
+      .finally(() => { if (!cancelado) setLoading(false) })
+    return () => { cancelado = true }
+  }, [])
+
   const filtered = useMemo(() => {
-    let data = [...MOCK_ALERTS]
+    let data = [...alerts]
     if (sevFilter)  data = data.filter((a) => a.severity === sevFilter)
     if (typeFilter) data = data.filter((a) => a.type === typeFilter)
     if (search.trim()) {
@@ -53,7 +74,7 @@ export default function AlertsTable() {
       return 0
     })
     return data
-  }, [sevFilter, typeFilter, search, sortKey, sortDir])
+  }, [alerts, sevFilter, typeFilter, search, sortKey, sortDir])
 
   function handleSort(key) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -69,7 +90,11 @@ export default function AlertsTable() {
     <div className={styles.page}>
       <div className="page-header">
         <h1>Tabela de Alertas</h1>
-        <p>{filtered.length} alerta{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
+        <p>
+          {filtered.length} alerta{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+          {' — '}
+          {loading ? 'carregando…' : isMock ? '⚠️ API indisponível, mostrando dados mockados' : '🟢 dados reais (api/alerts)'}
+        </p>
       </div>
 
       {/* Controls */}
