@@ -2,5 +2,8 @@ sqlalchemy
 pymysql
 cryptography
 bcrypt
+pymysql
+cryptography
+bcrypt
 flask
 flask-cors
