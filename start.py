@@ -1,22 +1,6 @@
 #!/usr/bin/env python3
 """
-Sobe backend + frontend com um único comando:
-
     python start.py
-
-O que ele faz:
-  1. Instala dependências Python (requirements.txt) e do frontend (npm install) se faltarem.
-  2. Backend: verifica o MySQL, cria o banco `banco_teste` se preciso, popula com
-     dados de teste (fillBank.py, só na primeira vez) e roda o monitoramento
-     (monitoramento.py) em loop.
-  3. Frontend: inicia o Vite (http://localhost:5173).
-  4. Ctrl+C encerra tudo.
-
-Opções:
-  --interval N   segundos entre varreduras do monitoramento (padrão: 30)
-  --reseed       apaga e recria as tabelas com dados de teste (resetBank + fillBank)
-  --no-backend   sobe só o frontend
-  --no-frontend  sobe só o backend
 """
 import argparse
 import os
@@ -50,7 +34,7 @@ def log(tag, msg):
 
 
 def spawn(cmd, cwd, tag):
-    """Inicia um processo filho e repassa a saída com prefixo."""
+    
     kwargs = {}
     if IS_WIN:
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
