@@ -68,8 +68,8 @@ class AuthLog(Base):
     # Tipo do evento: login_success, login_fail, token_invalid, etc.
     event_type = Column(String(50), nullable=False)
 
-    # Endereço IP da origem do evento, usado para detectar padrões maliciosos.
-    ip_address = Column(String(45), nullable=False)
+    # Endereço IP da origem do evento, usado para detectar padrões maliciosos (suporta payloads de teste).
+    ip_address = Column(String(255), nullable=False)
 
     # Momento em que o evento ocorreu.
     occurred_at = Column(DateTime, default=datetime.utcnow)

@@ -1,0 +1,10 @@
+{
+  "name": "sql-leak-detection",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Detecção de Vazamento de Dados via SQL — Backend e Frontend Integrados em Tempo Real",
+  "scripts": {
+    "start": "python start.py",
+    "dev": "python start.py"
+  }
+}

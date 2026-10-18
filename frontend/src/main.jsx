@@ -4,10 +4,14 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/global.css'
 
+import { RealtimeProvider } from './context/RealtimeContext'
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <RealtimeProvider>
+        <App />
+      </RealtimeProvider>
     </BrowserRouter>
   </React.StrictMode>
 )

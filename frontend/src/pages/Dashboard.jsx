@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer,
 } from 'recharts'
-import { MOCK_ALERTS, MOCK_ALERTS_OVER_TIME } from '../data/mockData'
+import { useRealtime } from '../context/RealtimeContext'
 import styles from './Dashboard.module.css'
 
 const ALERT_TYPES = [
@@ -35,23 +35,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Dashboard() {
-  const counts = useMemo(() => ({
-    ALTA:  MOCK_ALERTS.filter((a) => a.severity === 'ALTA').length,
-    MÉDIA: MOCK_ALERTS.filter((a) => a.severity === 'MÉDIA').length,
-    BAIXA: MOCK_ALERTS.filter((a) => a.severity === 'BAIXA').length,
-    total: MOCK_ALERTS.length,
-  }), [])
-
-  const typeCounts = useMemo(() => {
-    const map = {}
-    MOCK_ALERTS.forEach((a) => { map[a.type] = (map[a.type] || 0) + 1 })
-    return map
-  }, [])
-
-  const recentAlerts = useMemo(
-    () => [...MOCK_ALERTS].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5),
-    []
-  )
+  const { counts, typeCounts, recentAlerts, alertsOverTime, connectionStatus } = useRealtime()
 
   return (
     <div className={styles.page}>
@@ -97,7 +81,7 @@ export default function Dashboard() {
         <div className={`card ${styles.chartCard}`}>
           <h2 className={styles.cardTitle}>Alertas ao longo do tempo (hoje)</h2>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={MOCK_ALERTS_OVER_TIME} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
+            <AreaChart data={alertsOverTime} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradAlta" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="var(--chart-high)" stopOpacity={0.3} />

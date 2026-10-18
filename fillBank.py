@@ -4,8 +4,10 @@ from criarTabelas import Base, User, AuthLog, Store, Measurement
 from security import criptografar_dado
 from datetime import datetime, timedelta
 
-# Cria a conexão com o banco MySQL configurado localmente.
-engine = create_engine("mysql+pymysql://root:root@localhost:3306/banco_teste")
+from db_config import get_db_engine
+
+# Cria a conexão com o banco MySQL configurado via db_config.
+engine = get_db_engine()
 Base.metadata.create_all(engine)
 
 if "totp_secret" not in {column["name"] for column in inspect(engine).get_columns("users")}:

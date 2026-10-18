@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { MOCK_ALERTS } from '../data/mockData'
+import React, { useState, useMemo } from 'react'
+import { useRealtime } from '../context/RealtimeContext'
 import styles from './AlertsTable.module.css'
 
 const SEV_ORDER = { ALTA: 0, MÉDIA: 1, BAIXA: 2 }
@@ -26,26 +26,7 @@ export default function AlertsTable() {
   const [sortKey, setSortKey]       = useState('timestamp')
   const [sortDir, setSortDir]       = useState('desc')
 
-  const [alerts, setAlerts]   = useState(MOCK_ALERTS)
-  const [isMock, setIsMock]   = useState(true)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    let cancelado = false
-    fetch('/api/alerts')
-      .then((r) => { if (!r.ok) throw new Error('API respondeu ' + r.status); return r.json() })
-      .then((data) => {
-        if (cancelado) return
-        setAlerts(data)
-        setIsMock(false)
-      })
-      .catch(() => {
-        // API fora do ar: mantém os dados mockados para a tela não ficar vazia.
-        if (!cancelado) setIsMock(true)
-      })
-      .finally(() => { if (!cancelado) setLoading(false) })
-    return () => { cancelado = true }
-  }, [])
+  const { alerts, connectionStatus, actionLoading } = useRealtime()
 
   const filtered = useMemo(() => {
     let data = [...alerts]
@@ -93,7 +74,11 @@ export default function AlertsTable() {
         <p>
           {filtered.length} alerta{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
           {' — '}
-          {loading ? 'carregando…' : isMock ? '⚠️ API indisponível, mostrando dados mockados' : '🟢 dados reais (api/alerts)'}
+          {connectionStatus === 'mock'
+            ? '⚠️ API indisponível, mostrando dados mockados'
+            : connectionStatus === 'live'
+            ? '🟢 Sincronizado ao vivo com o MySQL (api/alerts)'
+            : '🔵 Atualizando em tempo real…'}
         </p>
       </div>
 

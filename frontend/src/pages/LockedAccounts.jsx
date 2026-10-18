@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { MOCK_LOCKED_ACCOUNTS } from '../data/mockData'
+import { useRealtime } from '../context/RealtimeContext'
 import styles from './LockedAccounts.module.css'
 
 function useCountdown(lockedUntil) {
@@ -47,87 +47,107 @@ function roleIcon(role) {
 }
 
 export default function LockedAccounts() {
+  const { lockedAccounts, connectionStatus, simulateAttack } = useRealtime()
   return (
     <div className={styles.page}>
       <div className="page-header">
         <h1>Contas Bloqueadas</h1>
         <p>
-          {MOCK_LOCKED_ACCOUNTS.length} conta{MOCK_LOCKED_ACCOUNTS.length !== 1 ? 's' : ''} em lockout
-          — contagem regressiva em tempo real
+          {lockedAccounts.length} conta{lockedAccounts.length !== 1 ? 's' : ''} em lockout
+          — contagem regressiva em tempo real ({connectionStatus === 'live' ? '🟢 Dados Reais do MySQL' : '⚠️ Modo de contingência'})
         </p>
       </div>
 
-      <div className={styles.cardGrid}>
-        {MOCK_LOCKED_ACCOUNTS.map((user) => (
-          <div key={user.id} className={`card ${styles.userCard}`}>
-            <div className={styles.userHeader}>
-              <span className={styles.userIcon}>{roleIcon(user.role)}</span>
-              <div className={styles.userInfo}>
-                <span className={styles.userName}>{user.username}</span>
-                <span className={styles.userRole}>{user.role}</span>
+      {lockedAccounts.length === 0 ? (
+        <div className={`card`} style={{ textAlign: 'center', padding: '40px 20px', marginBottom: 24 }}>
+          <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>🛡️</span>
+          <h2 style={{ fontSize: 18, marginBottom: 8 }}>Nenhuma conta bloqueada no momento</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Todos os usuários estão com credenciais normais e sem prazo de lockout ativo.
+          </p>
+          <button
+            className="btn-primary"
+            style={{ padding: '8px 16px', borderRadius: 6, background: 'var(--sev-high)', border: 'none', color: '#fff', fontWeight: 600 }}
+            onClick={() => simulateAttack('lockout')}
+          >
+            🔒 Simular Ataque de Lockout
+          </button>
+        </div>
+      ) : (
+        <div className={styles.cardGrid}>
+          {lockedAccounts.map((user) => (
+            <div key={user.id} className={`card ${styles.userCard}`}>
+              <div className={styles.userHeader}>
+                <span className={styles.userIcon}>{roleIcon(user.role)}</span>
+                <div className={styles.userInfo}>
+                  <span className={styles.userName}>{user.username}</span>
+                  <span className={styles.userRole}>{user.role}</span>
+                </div>
+                <span className={`badge badge-ALTA`} style={{ marginLeft: 'auto' }}>Bloqueado</span>
               </div>
-              <span className={`badge badge-ALTA`} style={{ marginLeft: 'auto' }}>Bloqueado</span>
-            </div>
 
-            <div className={styles.userStats}>
-              <StatRow icon="❌" label="Tentativas falhas" value={user.failedAttempts} />
-              <StatRow icon="🌐" label="Último IP suspeito" value={user.lastFailedIp} mono />
-              <StatRow
-                icon="🕒"
-                label="Bloqueado até"
-                value={new Date(user.lockedUntil).toLocaleString('pt-BR', {
-                  day: '2-digit', month: '2-digit',
-                  hour: '2-digit', minute: '2-digit',
-                })}
-              />
-            </div>
+              <div className={styles.userStats}>
+                <StatRow icon="❌" label="Tentativas falhas" value={user.failedAttempts} />
+                <StatRow icon="🌐" label="Último IP suspeito" value={user.lastFailedIp} mono />
+                <StatRow
+                  icon="🕒"
+                  label="Bloqueado até"
+                  value={new Date(user.lockedUntil).toLocaleString('pt-BR', {
+                    day: '2-digit', month: '2-digit',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                />
+              </div>
 
-            <div className={styles.countdownWrap}>
-              <span className={styles.countdownLabel}>Tempo restante</span>
-              <CountdownCell lockedUntil={user.lockedUntil} />
-            </div>
+              <div className={styles.countdownWrap}>
+                <span className={styles.countdownLabel}>Tempo restante</span>
+                <CountdownCell lockedUntil={user.lockedUntil} />
+              </div>
 
-            {/* Progress bar */}
-            <LockProgress lockedUntil={user.lockedUntil} />
-          </div>
-        ))}
-      </div>
+              {/* Progress bar */}
+              <LockProgress lockedUntil={user.lockedUntil} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Summary table */}
-      <div className={`card ${styles.tableCard}`}>
-        <h2 className={styles.tableTitle}>Resumo de lockouts</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Usuário</th>
-                <th>Role</th>
-                <th>Tentativas falhas</th>
-                <th>Último IP</th>
-                <th>Bloqueado até</th>
-                <th>Restante</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_LOCKED_ACCOUNTS.map((user) => (
-                <tr key={user.id}>
-                  <td className="td-mono">{user.username}</td>
-                  <td className="td-muted">{roleIcon(user.role)} {user.role}</td>
-                  <td style={{ color: 'var(--sev-high)', fontWeight: 700 }}>{user.failedAttempts}</td>
-                  <td className="td-mono">{user.lastFailedIp}</td>
-                  <td className="td-muted">
-                    {new Date(user.lockedUntil).toLocaleString('pt-BR', {
-                      day: '2-digit', month: '2-digit',
-                      hour: '2-digit', minute: '2-digit',
-                    })}
-                  </td>
-                  <td><CountdownCell lockedUntil={user.lockedUntil} /></td>
+      {lockedAccounts.length > 0 && (
+        <div className={`card ${styles.tableCard}`}>
+          <h2 className={styles.tableTitle}>Resumo de lockouts</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Role</th>
+                  <th>Tentativas falhas</th>
+                  <th>Último IP</th>
+                  <th>Bloqueado até</th>
+                  <th>Restante</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {lockedAccounts.map((user) => (
+                  <tr key={user.id}>
+                    <td className="td-mono">{user.username}</td>
+                    <td className="td-muted">{roleIcon(user.role)} {user.role}</td>
+                    <td style={{ color: 'var(--sev-high)', fontWeight: 700 }}>{user.failedAttempts}</td>
+                    <td className="td-mono">{user.lastFailedIp}</td>
+                    <td className="td-muted">
+                      {new Date(user.lockedUntil).toLocaleString('pt-BR', {
+                        day: '2-digit', month: '2-digit',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </td>
+                    <td><CountdownCell lockedUntil={user.lockedUntil} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

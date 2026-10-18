@@ -82,51 +82,50 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2. Subir o projeto principal (backend de monitoramento + frontend)
+### 2. Subir tudo com um único comando (Backend API + SSE + Monitoramento + Frontend)
 
-```
+```bash
 python start.py
 ```
+*(ou simplesmente `npm start` na raiz do projeto)*
 
-Isso faz tudo de uma vez:
-- cria o banco `banco_teste` se não existir e popula com dados de teste (`fillBank.py`), só na primeira vez;
-- roda `monitoramento.py` em loop, imprimindo os alertas detectados no terminal a cada 30s;
-- sobe o frontend em **http://localhost:5173**.
+Isso executa **Backend e Frontend integrados e rodando juntos**:
+- Verifica e conecta ao MySQL (porta `3306`, usuário `root`, senha `1234` ou `root` com fallback automático);
+- Prepara o banco `banco_teste` e popula com dados de teste (`fillBank.py`), se necessário;
+- Sobe o **Backend API** (Flask + Server-Sent Events na porta `5000`);
+- Sobe o **Frontend Dashboard** (React + Vite na porta `5173`);
+- Roda a auditoria contínua de segurança (IDS/IPS) em loop;
+- **Ctrl+C** encerra ambos simultaneamente de forma limpa.
 
 Opções úteis:
-```
-python start.py --reseed         # apaga e recria o banco com dados de teste do zero
-python start.py --interval 10    # varredura a cada 10s em vez de 30s
-python start.py --no-frontend    # só o backend
-python start.py --no-backend     # só o frontend
-```
-
-### 3. Subir a API dos alertas (para o dashboard mostrar dados reais)
-
-Em um **segundo terminal**, na mesma pasta:
-
-```
-.venv\Scripts\activate
-python api.py
+```bash
+python start.py --reseed         # Apaga e recria o banco com dados de teste do zero
+python start.py --interval 10    # Varredura IDS no terminal a cada 10s em vez de 30s
+python start.py --no-frontend    # Sobe apenas o backend
+python start.py --no-backend     # Sobe apenas o frontend
 ```
 
-Sobe em `http://localhost:5000`. Com ela no ar, a tela "Alertas" do dashboard passa a mostrar `🟢 dados reais (api/alerts)` em vez de dados mockados.
+### 3. Operação em Tempo Real (Real-Time)
 
-### 4. (Opcional) Simular um ataque para testar a detecção na prática
+O sistema opera com streaming de eventos e sincronização contínua:
+- **Server-Sent Events (SSE)** em `/api/stream`: o backend empurra novas anomalias e estatísticas em tempo real para o dashboard web;
+- **Polling Fallback**: garantia de continuidade mesmo em oscilações de rede;
+- **Indicador Ao Vivo na barra superior**: exibe status de conexão (`AO VIVO`, `POLLING`, `PAUSADO`), hora da última sincronização e botões de controle;
+- **Botão "⚡ Simular Ataque" na UI**: permite disparar ataques de teste (Força Bruta, Movimentação Lateral, SQL Injection, Lockout, Exportação Massiva) diretamente pelo navegador e assistir à detecção ocorrendo **ao vivo** sem precisar recarregar a página!
 
-Em um terceiro terminal, com o `api.py` já rodando:
+### 4. (Opcional) Simular ataques via terminal
 
-```
+Além do botão na interface web, você também pode disparar os ataques pelo terminal:
+
+```bash
 python pentest.py
 ```
 
-Isso insere no banco, com timestamps recentes, os padrões de ataque da tabela acima e já roda `monitoramento.py` no final para mostrar o que foi pego. Recarregue o dashboard depois — os novos alertas aparecem na Tabela de Alertas.
-
-Use `python pentest.py --clean` para limpar `auth_logs` e `measurements` antes de injetar os ataques.
+Use `python pentest.py --clean` para limpar os logs antes de uma nova demonstração.
 
 ### 5. Resetar o banco
 
-```
+```bash
 python resetBank.py
 ```
 

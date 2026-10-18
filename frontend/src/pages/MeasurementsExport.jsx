@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ReferenceLine, ResponsiveContainer, Cell,
 } from 'recharts'
-import { MOCK_MEASUREMENTS } from '../data/mockData'
+import { useRealtime } from '../context/RealtimeContext'
 import styles from './MeasurementsExport.module.css'
 
 const THRESHOLD = 50   // acima disso → ALTA
@@ -44,9 +44,11 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function MeasurementsExport() {
+  const { measurements, connectionStatus, simulateAttack } = useRealtime()
+
   const data = useMemo(
-    () => MOCK_MEASUREMENTS.map((m) => ({ ...m, sev: severityOf(m.measurements24h) })),
-    []
+    () => (measurements || []).map((m) => ({ ...m, sev: severityOf(m.measurements24h) })),
+    [measurements]
   )
 
   const anomalous = data.filter((d) => d.sev !== 'normal')
@@ -57,6 +59,8 @@ export default function MeasurementsExport() {
         <h1>Medições por Loja — Últimas 24h</h1>
         <p>
           Baseline esperado: ~{BASELINE} medições/dia. Limiar de atenção: {WARNING}+. Limiar crítico: {THRESHOLD}+.
+          {' — '}
+          {connectionStatus === 'live' ? '🟢 Dados Reais do MySQL (measurements)' : '⚠️ Modo mock'}
         </p>
       </div>
 

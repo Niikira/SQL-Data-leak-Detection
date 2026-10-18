@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { useRealtime } from '../context/RealtimeContext'
 import { MOCK_IP_EVENTS, KNOWN_IPS } from '../data/mockData'
 import styles from './IpInvestigation.module.css'
 
@@ -7,25 +8,58 @@ const EVENT_META = {
   login_failed:    { label: 'Falha de login',     color: '#ef4444',  icon: '❌' },
   token_invalid:   { label: 'Token inválido',     color: '#f59e0b',  icon: '🔑' },
   priv_escalation: { label: 'Escalação de priv.', color: '#a855f7',  icon: '⬆️' },
+  login_attempt:   { label: 'Tentativa suspeita', color: '#ec4899',  icon: '⚡' },
 }
 
 export default function IpInvestigation() {
+  const { knownIps, connectionStatus } = useRealtime()
   const [query, setQuery]   = useState('')
   const [ip, setIp]         = useState('')
   const [filterType, setFilterType] = useState('')
+  const [liveEvents, setLiveEvents] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const activeKnownIps = useMemo(() => {
+    return Array.from(new Set([...(knownIps || []), ...KNOWN_IPS]))
+  }, [knownIps])
+
+  useEffect(() => {
+    if (!ip) {
+      setLiveEvents(null)
+      return
+    }
+    let cancel = false
+    setLoading(true)
+    fetch(`/api/ip-investigation?ip=${encodeURIComponent(ip)}`)
+      .then((r) => { if (!r.ok) throw new Error('API erro'); return r.json() })
+      .then((data) => {
+        if (cancel) return
+        if (data.events && data.events.length > 0) {
+          setLiveEvents(data.events)
+        } else {
+          setLiveEvents(MOCK_IP_EVENTS[ip] || [])
+        }
+      })
+      .catch(() => {
+        if (!cancel) setLiveEvents(MOCK_IP_EVENTS[ip] || [])
+      })
+      .finally(() => { if (!cancel) setLoading(false) })
+
+    return () => { cancel = true }
+  }, [ip])
 
   const events = useMemo(() => {
     if (!ip) return []
-    const raw = MOCK_IP_EVENTS[ip] || []
+    const raw = liveEvents !== null ? liveEvents : (MOCK_IP_EVENTS[ip] || [])
     const filtered = filterType ? raw.filter((e) => e.eventType === filterType) : raw
     return [...filtered].sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt))
-  }, [ip, filterType])
+  }, [ip, liveEvents, filterType])
 
   const eventTypeCounts = useMemo(() => {
     if (!ip) return {}
-    const raw = MOCK_IP_EVENTS[ip] || []
+    const raw = liveEvents !== null ? liveEvents : (MOCK_IP_EVENTS[ip] || [])
     return raw.reduce((acc, e) => { acc[e.eventType] = (acc[e.eventType] || 0) + 1; return acc }, {})
-  }, [ip])
+  }, [ip, liveEvents])
 
   function handleSearch(e) {
     e.preventDefault()
@@ -33,7 +67,7 @@ export default function IpInvestigation() {
     if (trimmed) setIp(trimmed)
   }
 
-  const suggestions = KNOWN_IPS.filter(
+  const suggestions = activeKnownIps.filter(
     (k) => k.includes(query) && k !== query && query.length > 0
   )
 
@@ -41,7 +75,11 @@ export default function IpInvestigation() {
     <div className={styles.page}>
       <div className="page-header">
         <h1>Investigação de IP</h1>
-        <p>Reconstrução cronológica de todos os eventos de um endereço IP</p>
+        <p>
+          Reconstrução cronológica de eventos por endereço IP
+          {' — '}
+          {connectionStatus === 'live' ? '🟢 Conectado ao MySQL (auth_logs)' : '⚠️ Modo mock'}
+        </p>
       </div>
 
       {/* Search */}
@@ -72,9 +110,9 @@ export default function IpInvestigation() {
       {/* Known IPs hint */}
       {!ip && (
         <div className={styles.hintBox}>
-          <span className={styles.hintTitle}>IPs com eventos registrados nos mocks:</span>
+          <span className={styles.hintTitle}>IPs sugeridos com eventos de auditoria detectados:</span>
           <div className={styles.hintChips}>
-            {KNOWN_IPS.map((k) => (
+            {activeKnownIps.slice(0, 10).map((k) => (
               <button
                 key={k}
                 className={styles.chip}
@@ -94,7 +132,7 @@ export default function IpInvestigation() {
           <div className={`card ${styles.ipSummary}`}>
             <div className={styles.ipTitle}>
               <span className={styles.ipAddr}>{ip}</span>
-              <span className={styles.ipTotal}>{(MOCK_IP_EVENTS[ip] || []).length} evento(s) total</span>
+              <span className={styles.ipTotal}>{events.length} evento(s) total {loading ? '(buscando…)' : ''}</span>
             </div>
             <div className={styles.countChips}>
               {Object.entries(eventTypeCounts).map(([type, count]) => {
