@@ -1,9 +1,8 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ReferenceLine, ResponsiveContainer, Cell,
 } from 'recharts'
-import { MOCK_MEASUREMENTS } from '../data/mockData'
 import styles from './MeasurementsExport.module.css'
 
 const THRESHOLD = 50   // acima disso → ALTA
@@ -44,9 +43,23 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function MeasurementsExport() {
+  const [rows, setRows] = useState([])
+
+  useEffect(() => {
+    let cancelado = false
+    const carregar = () =>
+      fetch('/api/measurements')
+        .then((r) => (r.ok ? r.json() : []))
+        .then((d) => { if (!cancelado) setRows(Array.isArray(d) ? d : []) })
+        .catch(() => { if (!cancelado) setRows([]) })
+    carregar()
+    const timer = setInterval(carregar, 5000)
+    return () => { cancelado = true; clearInterval(timer) }
+  }, [])
+
   const data = useMemo(
-    () => MOCK_MEASUREMENTS.map((m) => ({ ...m, sev: severityOf(m.measurements24h) })),
-    []
+    () => rows.map((m) => ({ ...m, sev: severityOf(m.measurements24h) })),
+    [rows]
   )
 
   const anomalous = data.filter((d) => d.sev !== 'normal')
@@ -59,6 +72,12 @@ export default function MeasurementsExport() {
           Baseline esperado: ~{BASELINE} medições/dia. Limiar de atenção: {WARNING}+. Limiar crítico: {THRESHOLD}+.
         </p>
       </div>
+
+      {data.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+          Nenhuma medição nas últimas 24h. Rode o pentest na aba “Alertas” para gerar exportação massiva.
+        </div>
+      )}
 
       {/* Alert banner */}
       {anomalous.length > 0 && (

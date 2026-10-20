@@ -1,9 +1,8 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer,
 } from 'recharts'
-import { MOCK_ALERTS, MOCK_ALERTS_OVER_TIME } from '../data/mockData'
 import styles from './Dashboard.module.css'
 
 const ALERT_TYPES = [
@@ -35,26 +34,107 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Dashboard() {
+  // Começa zerado; só enche com o que a API real detectar (ex.: após o pentest).
+  const [alerts, setAlerts] = useState([])
+
+  useEffect(() => {
+    let cancelado = false
+    const carregar = () =>
+      fetch('/api/alerts')
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => { if (!cancelado) setAlerts(Array.isArray(data) ? data : []) })
+        .catch(() => { if (!cancelado) setAlerts([]) })
+    carregar()
+    // Atualiza sozinho a cada 5s, então rodar o pentest reflete aqui sem recarregar.
+    const timer = setInterval(carregar, 5000)
+    return () => { cancelado = true; clearInterval(timer) }
+  }, [])
+
+  const [busy, setBusy]     = useState(false)
+  const [aviso, setAviso]   = useState(null)
+
+  function refetch() {
+    return fetch('/api/alerts')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setAlerts(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }
+
+  function rodarPentest() {
+    if (busy) return
+    setBusy(true); setAviso(null)
+    fetch('/api/pentest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clean: true }),
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.error) throw new Error(res.error)
+        setAlerts(res.alerts || [])
+        setAviso({ ok: true, msg: `✅ ${res.injectedCount} ataques injetados — ${res.detectedCount} alertas detectados.` })
+      })
+      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + (e.message || e) }))
+      .finally(() => setBusy(false))
+  }
+
+  function zerarPainel() {
+    if (busy) return
+    setBusy(true); setAviso(null)
+    fetch('/api/reset', { method: 'POST' })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.error) throw new Error(res.error)
+        return refetch()
+      })
+      .then(() => setAviso({ ok: true, msg: '🧹 Painel zerado. Rode o pentest para gerar detecções.' }))
+      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + (e.message || e) }))
+      .finally(() => setBusy(false))
+  }
+
   const counts = useMemo(() => ({
-    ALTA:  MOCK_ALERTS.filter((a) => a.severity === 'ALTA').length,
-    MÉDIA: MOCK_ALERTS.filter((a) => a.severity === 'MÉDIA').length,
-    BAIXA: MOCK_ALERTS.filter((a) => a.severity === 'BAIXA').length,
-    total: MOCK_ALERTS.length,
-  }), [])
+    ALTA:  alerts.filter((a) => a.severity === 'ALTA').length,
+    MÉDIA: alerts.filter((a) => a.severity === 'MÉDIA').length,
+    BAIXA: alerts.filter((a) => a.severity === 'BAIXA').length,
+    total: alerts.length,
+  }), [alerts])
 
   const typeCounts = useMemo(() => {
     const map = {}
-    MOCK_ALERTS.forEach((a) => { map[a.type] = (map[a.type] || 0) + 1 })
+    alerts.forEach((a) => { map[a.type] = (map[a.type] || 0) + 1 })
     return map
-  }, [])
+  }, [alerts])
+
+  const overTime = useMemo(() => buildOverTime(alerts), [alerts])
 
   const recentAlerts = useMemo(
-    () => [...MOCK_ALERTS].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5),
-    []
+    () => [...alerts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5),
+    [alerts]
   )
 
   return (
     <div className={styles.page}>
+      {/* ── Demo: pentest / zerar ─────────────────────────────────────── */}
+      <div className={styles.demoBar}>
+        <div>
+          <strong>Simulado de pentest</strong>
+          <span className={styles.demoHint}> — zere o painel, rode o pentest e veja os números subirem.</span>
+        </div>
+        <div className={styles.demoBtns}>
+          <button className="btn" onClick={rodarPentest} disabled={busy}>
+            {busy ? '⏳ Processando…' : '🔴 Rodar Pentest'}
+          </button>
+          <button className="btn" onClick={zerarPainel} disabled={busy}>
+            🧹 Zerar painel
+          </button>
+        </div>
+      </div>
+      {aviso && (
+        <div className={`${styles.demoAviso} ${aviso.ok ? styles.avisoOk : styles.avisoErr}`}>
+          {aviso.msg}
+        </div>
+      )}
+
       {/* ── Summary cards ─────────────────────────────────────────────── */}
       <div className={styles.summaryGrid}>
         <SummaryCard
@@ -97,7 +177,7 @@ export default function Dashboard() {
         <div className={`card ${styles.chartCard}`}>
           <h2 className={styles.cardTitle}>Alertas ao longo do tempo (hoje)</h2>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={MOCK_ALERTS_OVER_TIME} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
+            <AreaChart data={overTime} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gradAlta" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="var(--chart-high)" stopOpacity={0.3} />
@@ -162,15 +242,23 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {recentAlerts.map((a) => (
-                <tr key={a.id}>
-                  <td><span className={`badge badge-${a.severity}`}>{a.severity}</span></td>
-                  <td className="td-muted">{a.typeLabel}</td>
-                  <td className="td-mono">{a.target}</td>
-                  <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.details}</td>
-                  <td className="td-muted" style={{ whiteSpace: 'nowrap' }}>{fmtTs(a.timestamp)}</td>
+              {recentAlerts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                    Nenhum alerta no momento. Rode o pentest na aba “Alertas” para gerar detecções.
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                recentAlerts.map((a) => (
+                  <tr key={a.id}>
+                    <td><span className={`badge badge-${a.severity}`}>{a.severity}</span></td>
+                    <td className="td-muted">{a.typeLabel}</td>
+                    <td className="td-mono">{a.target}</td>
+                    <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.details}</td>
+                    <td className="td-muted" style={{ whiteSpace: 'nowrap' }}>{fmtTs(a.timestamp)}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -190,6 +278,28 @@ function SummaryCard({ label, value, sub, color, bg, icon }) {
       <div className={styles.summarySub}>{sub}</div>
     </div>
   )
+}
+
+// Agrupa os alertas reais por hora do dia (HH:00) para o gráfico.
+// Sem alertas, devolve as últimas 6 horas zeradas — o gráfico fica achatado no 0.
+function buildOverTime(alerts) {
+  const byHour = {}
+  alerts.forEach((a) => {
+    const d = new Date(a.timestamp)
+    if (isNaN(d)) return
+    const key = `${String(d.getHours()).padStart(2, '0')}:00`
+    if (!byHour[key]) byHour[key] = { hour: key, ALTA: 0, 'MÉDIA': 0, BAIXA: 0 }
+    if (byHour[key][a.severity] !== undefined) byHour[key][a.severity] += 1
+  })
+  let rows = Object.values(byHour).sort((x, y) => x.hour.localeCompare(y.hour))
+  if (rows.length === 0) {
+    const nowH = new Date().getHours()
+    rows = Array.from({ length: 6 }, (_, i) => {
+      const h = (nowH - (5 - i) + 24) % 24
+      return { hour: `${String(h).padStart(2, '0')}:00`, ALTA: 0, 'MÉDIA': 0, BAIXA: 0 }
+    })
+  }
+  return rows
 }
 
 function fmtTs(iso) {

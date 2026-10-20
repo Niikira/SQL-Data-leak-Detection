@@ -6,6 +6,11 @@ __pycache__/
 *.db
 *.sqlite3
 .env
+.venv/
+venv/
+
+# Tooling local do editor/agente
+.claude/
 
 # Remove already-tracked binaries
 # (run: git rm --cached banco_teste.db __pycache__/ -r)

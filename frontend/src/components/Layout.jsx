@@ -60,7 +60,7 @@ export default function Layout() {
           </span>
           <span className={styles.topbarMeta}>
             <span className={styles.dot} />
-            Sistema ativo — dados mockados
+            Sistema ativo — monitorando
             <span className={styles.time}>{new Date().toLocaleTimeString('pt-BR')}</span>
           </span>
         </header>
