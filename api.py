@@ -20,7 +20,7 @@ from flask_cors import CORS
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-DB_URL = "mysql+pymysql://root:root@localhost:3306/banco_teste"
+from db_config import DB_URL
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
 

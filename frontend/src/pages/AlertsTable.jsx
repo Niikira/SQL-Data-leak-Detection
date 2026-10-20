@@ -60,17 +60,25 @@ export default function AlertsTable() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clean: !!clean }),
     })
-      .then((r) => r.json().then((j) => {
-        if (!r.ok) throw new Error(j.error || ('API respondeu ' + r.status))
+      .then(async (r) => {
+        const txt = await r.text()
+        if (!r.ok || !txt.trim()) throw new Error('API-OFFLINE')
+        let j
+        try { j = JSON.parse(txt) } catch { throw new Error('API-OFFLINE') }
+        if (j.error) throw new Error(j.error)
         return j
-      }))
+      })
       .then((res) => {
         setAlerts(res.alerts)
         setIsMock(false)
         setPentestResult({ ok: true, ...res })
       })
       .catch((e) => {
-        setPentestResult({ ok: false, error: String(e.message || e) })
+        const m = String(e.message || e)
+        const amigavel = (m === 'API-OFFLINE' || m.includes('Failed to fetch') || m.includes('JSON'))
+          ? 'Não consegui falar com a API. Confira se o MySQL está ligado (usuário root, senha root) e reinicie pelo iniciar.bat.'
+          : m
+        setPentestResult({ ok: false, error: amigavel })
       })
       .finally(() => setPentesting(false))
   }

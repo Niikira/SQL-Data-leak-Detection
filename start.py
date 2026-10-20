@@ -20,6 +20,7 @@ Opções:
 """
 import argparse
 import os
+import shutil
 import signal
 import socket
 import subprocess
@@ -37,7 +38,7 @@ VENV = ROOT / ".venv"
 PY = str(VENV / ("Scripts/python.exe" if IS_WIN else "bin/python"))
 
 # Mesmos dados de conexão usados nos scripts do projeto.
-DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME = "localhost", 3306, "root", "root", "banco_teste"
+from db_config import DB_HOST, DB_PORT, DB_USER, DB_NAME, DB_PASSWORD as DB_PASS
 
 COLORS = {"backend": "\033[96m", "frontend": "\033[95m", "start": "\033[92m", "api": "\033[93m"}
 RESET = "\033[0m"
@@ -201,6 +202,16 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
+    # Sem Node.js/npm não dá para subir o dashboard — avisa de forma clara
+    # em vez de estourar um traceback feio no npm install.
+    if not args.no_frontend and shutil.which(NPM) is None and shutil.which("npm") is None:
+        log("start", "")
+        log("start", "Node.js/npm não encontrado. O dashboard (frontend) precisa do Node.js.")
+        log("start", "Instale a versão LTS em https://nodejs.org , feche este terminal,")
+        log("start", "abra de novo e rode o iniciar.bat novamente.")
+        log("start", "")
+        args.no_frontend = True
+
     if not args.no_backend:
         ensure_python_deps()
     if not args.no_frontend:
@@ -209,7 +220,7 @@ def main():
     if not args.no_backend:
         if not mysql_up():
             log("backend", f"MySQL não está respondendo em {DB_HOST}:{DB_PORT}. "
-                           "Inicie o serviço do MySQL (usuário root / senha 1234). "
+                           "Inicie o serviço do MySQL (usuário root / senha root). "
                            "Seguindo só com o frontend.")
             args.no_backend = True
         elif not prepare_database(args.reseed):

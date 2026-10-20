@@ -4,7 +4,7 @@ from criarTabelas import User
 from security import descriptografar_dado
 
 # URL de conexão com o banco MySQL usado para os testes de autenticação.
-DB_URL = "mysql+pymysql://root:root@localhost:3306/banco_teste"
+from db_config import DB_URL
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
 
