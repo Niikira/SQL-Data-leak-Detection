@@ -71,7 +71,7 @@ Não existe "site vítima" para atacar de fora: a análise é feita **direto sob
 
 - **Python 3.10+** instalado e no PATH
 - **Node.js e npm** instalados
-- **MySQL Server** rodando em `localhost:3306`, com usuário `root` e senha `root` (é o que todos os scripts esperam; se a sua for outra, veja [Solução de problemas](#solução-de-problemas))
+- **MySQL Server** rodando em `localhost:3306`, com usuário `root` e senha `root` (padrão). **Se a sua senha/usuário for diferente, mude em um lugar só: o arquivo `db_config.py`** (veja [Solução de problemas](#solução-de-problemas))
 
 > O banco `banco_teste` é criado e populado automaticamente na primeira execução.
 
@@ -168,7 +168,13 @@ Quer repetir? Clique em **Zerar painel** e rode o pentest de novo.
 
 ## Solução de problemas
 
-**`Access denied for user 'root'@'localhost'`** — a senha do MySQL na sua máquina não é `root`. Ou troque a senha do root para `root` (`ALTER USER 'root'@'localhost' IDENTIFIED BY 'root'; FLUSH PRIVILEGES;`), ou ajuste a senha nas strings de conexão de `start.py`, `api.py`, `pentest.py`, `fillBank.py`, `monitoramento.py`, `resetBank.py` e `auth_demo.py` (todos usam `mysql+pymysql://root:root@localhost:3306/banco_teste`).
+**`Access denied for user 'root'@'localhost'`** — a senha (ou o usuário) do MySQL na sua máquina é diferente do padrão `root`/`root`. **Abra o arquivo `db_config.py` e troque a senha em `DB_PASSWORD`** (e `DB_USER`, se precisar). É o único lugar para mudar — todos os scripts leem dali. Exemplo, se a sua senha for `1234`:
+
+```python
+DB_PASSWORD = os.getenv("MYSQL_PASSWORD", "1234")
+```
+
+Alternativa sem editar arquivo: defina a variável de ambiente antes de rodar — no Windows, `set MYSQL_PASSWORD=1234` (ou `MYSQL_USER`, `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`).
 
 **O navegador abre mas o painel fica tudo zerado** — isso é o estado inicial normal (não há mais dados de demonstração). Clique em **Rodar Pentest** para gerar detecções.
 

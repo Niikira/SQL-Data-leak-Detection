@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
 # Configuração da conexão com o banco MySQL usado para consultar os logs e usuários.
-DB_URL = "mysql+pymysql://root:root@localhost:3306/banco_teste"
+from db_config import DB_URL
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
 

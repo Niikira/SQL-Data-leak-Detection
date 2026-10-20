@@ -5,7 +5,8 @@ from security import criptografar_dado
 from datetime import datetime, timedelta
 
 # Cria a conexão com o banco MySQL configurado localmente.
-engine = create_engine("mysql+pymysql://root:root@localhost:3306/banco_teste")
+from db_config import DB_URL
+engine = create_engine(DB_URL)
 Base.metadata.create_all(engine)
 
 if "totp_secret" not in {column["name"] for column in inspect(engine).get_columns("users")}:

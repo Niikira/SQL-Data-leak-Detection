@@ -33,6 +33,30 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
+// POST que trata resposta vazia/HTML (API fora do ar) sem estourar "JSON.parse".
+async function postJson(url, body) {
+  const opt = body
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    : { method: 'POST' }
+  const r = await fetch(url, opt)
+  const txt = await r.text()
+  if (!r.ok) throw new Error('API-OFFLINE')
+  if (!txt.trim()) throw new Error('API-OFFLINE')
+  let data
+  try { data = JSON.parse(txt) } catch { throw new Error('API-OFFLINE') }
+  if (data && data.error) throw new Error(data.error)
+  return data
+}
+
+// Transforma qualquer falha de rede/parse numa dica acionável.
+function msgErro(e) {
+  const m = String((e && e.message) || e)
+  if (m === 'API-OFFLINE' || m.includes('Failed to fetch') || m.includes('NetworkError') || m.includes('JSON')) {
+    return 'Não consegui falar com a API. Confira se o MySQL está ligado (usuário root, senha root) e reinicie pelo iniciar.bat.'
+  }
+  return m
+}
+
 export default function Dashboard() {
   // Começa zerado; só enche com o que a API real detectar (ex.: após o pentest).
   const [alerts, setAlerts] = useState([])
@@ -63,32 +87,22 @@ export default function Dashboard() {
   function rodarPentest() {
     if (busy) return
     setBusy(true); setAviso(null)
-    fetch('/api/pentest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clean: true }),
-    })
-      .then((r) => r.json())
+    postJson('/api/pentest', { clean: true })
       .then((res) => {
-        if (res.error) throw new Error(res.error)
         setAlerts(res.alerts || [])
         setAviso({ ok: true, msg: `✅ ${res.injectedCount} ataques injetados — ${res.detectedCount} alertas detectados.` })
       })
-      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + (e.message || e) }))
+      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + msgErro(e) }))
       .finally(() => setBusy(false))
   }
 
   function zerarPainel() {
     if (busy) return
     setBusy(true); setAviso(null)
-    fetch('/api/reset', { method: 'POST' })
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.error) throw new Error(res.error)
-        return refetch()
-      })
+    postJson('/api/reset')
+      .then(() => refetch())
       .then(() => setAviso({ ok: true, msg: '🧹 Painel zerado. Rode o pentest para gerar detecções.' }))
-      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + (e.message || e) }))
+      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + msgErro(e) }))
       .finally(() => setBusy(false))
   }
 
