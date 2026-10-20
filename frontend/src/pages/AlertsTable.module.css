@@ -29,3 +29,27 @@
 .type_WEAK_HASH       { color: var(--sev-high); }
 .type_OFF_HOURS       { color: var(--sev-low); }
 .type_SHORT_TOTP      { color: var(--sev-med); }
+
+/* Barra de pentest (simular ataque) */
+.pentestBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated, rgba(127,127,127,0.06));
+}
+.pentestBtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.pentestHint { color: var(--text-muted); font-size: 13px; }
+.pentestResult {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.resultOk  { border-color: var(--sev-high); background: rgba(220, 38, 38, 0.08); }
+.resultErr { border-color: var(--sev-med);  background: rgba(234, 179, 8, 0.10); }

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { MOCK_ALERTS } from '../data/mockData'
 import styles from './AlertsTable.module.css'
 
 const SEV_ORDER = { ALTA: 0, MÉDIA: 1, BAIXA: 2 }
@@ -26,26 +25,55 @@ export default function AlertsTable() {
   const [sortKey, setSortKey]       = useState('timestamp')
   const [sortDir, setSortDir]       = useState('desc')
 
-  const [alerts, setAlerts]   = useState(MOCK_ALERTS)
-  const [isMock, setIsMock]   = useState(true)
+  const [alerts, setAlerts]   = useState([])
+  const [isMock, setIsMock]   = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    let cancelado = false
-    fetch('/api/alerts')
+  // Estado do "Rodar Pentest": se está rodando e o resultado da última rodada.
+  const [pentesting, setPentesting]       = useState(false)
+  const [pentestResult, setPentestResult] = useState(null)
+
+  function loadAlerts() {
+    setLoading(true)
+    return fetch('/api/alerts')
       .then((r) => { if (!r.ok) throw new Error('API respondeu ' + r.status); return r.json() })
       .then((data) => {
-        if (cancelado) return
         setAlerts(data)
         setIsMock(false)
+        return data
       })
       .catch(() => {
         // API fora do ar: mantém os dados mockados para a tela não ficar vazia.
-        if (!cancelado) setIsMock(true)
+        setIsMock(true)
       })
-      .finally(() => { if (!cancelado) setLoading(false) })
-    return () => { cancelado = true }
-  }, [])
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { loadAlerts() }, [])
+
+  function runPentest(clean) {
+    if (pentesting) return
+    setPentesting(true)
+    setPentestResult(null)
+    fetch('/api/pentest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clean: !!clean }),
+    })
+      .then((r) => r.json().then((j) => {
+        if (!r.ok) throw new Error(j.error || ('API respondeu ' + r.status))
+        return j
+      }))
+      .then((res) => {
+        setAlerts(res.alerts)
+        setIsMock(false)
+        setPentestResult({ ok: true, ...res })
+      })
+      .catch((e) => {
+        setPentestResult({ ok: false, error: String(e.message || e) })
+      })
+      .finally(() => setPentesting(false))
+  }
 
   const filtered = useMemo(() => {
     let data = [...alerts]
@@ -93,9 +121,47 @@ export default function AlertsTable() {
         <p>
           {filtered.length} alerta{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
           {' — '}
-          {loading ? 'carregando…' : isMock ? '⚠️ API indisponível, mostrando dados mockados' : '🟢 dados reais (api/alerts)'}
+          {loading ? 'carregando…' : isMock ? '⚠️ API indisponível (sem dados)' : '🟢 dados reais (api/alerts)'}
         </p>
       </div>
+
+      {/* Pentest: injeta ataques no banco e mostra o que a detecção pegou */}
+      <div className={styles.pentestBar}>
+        <div>
+          <strong>Simular ataque (pentest)</strong>
+          <span className={styles.pentestHint}>
+            {' '}injeta os 7 padrões de ataque no banco e recarrega os alertas detectados.
+          </span>
+        </div>
+        <div className={styles.pentestBtns}>
+          <button className="btn" onClick={() => runPentest(false)} disabled={pentesting}>
+            {pentesting ? '⏳ Rodando…' : '🔴 Rodar Pentest'}
+          </button>
+          <button className="btn" onClick={() => runPentest(true)} disabled={pentesting} title="Limpa logs/medições antes de atacar">
+            🧹 Pentest (rodada limpa)
+          </button>
+          <button className="btn" onClick={loadAlerts} disabled={pentesting || loading}>
+            🔄 Atualizar
+          </button>
+        </div>
+      </div>
+
+      {pentestResult && (
+        <div className={`${styles.pentestResult} ${pentestResult.ok ? styles.resultOk : styles.resultErr}`}>
+          {pentestResult.ok ? (
+            <>
+              <strong>
+                ✅ {pentestResult.injectedCount} ataques injetados — {pentestResult.detectedCount} alerta
+                {pentestResult.detectedCount !== 1 ? 's' : ''} detectado{pentestResult.detectedCount !== 1 ? 's' : ''}
+                {pentestResult.cleaned ? ' (rodada limpa)' : ''}.
+              </strong>
+              <span className={styles.pentestHint}> A detecção funcionou: os padrões abaixo foram capturados.</span>
+            </>
+          ) : (
+            <strong>⚠️ Falha ao rodar o pentest: {pentestResult.error}</strong>
+          )}
+        </div>
+      )}
 
       {/* Controls */}
       <div className="ctrl-row">

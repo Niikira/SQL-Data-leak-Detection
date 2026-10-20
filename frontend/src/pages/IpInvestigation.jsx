@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react'
-import { MOCK_IP_EVENTS, KNOWN_IPS } from '../data/mockData'
+import React, { useState, useMemo, useEffect } from 'react'
 import styles from './IpInvestigation.module.css'
 
 const EVENT_META = {
   login_success:   { label: 'Login bem-sucedido', color: '#22c55e',  icon: '✅' },
+  login_fail:      { label: 'Falha de login',     color: '#ef4444',  icon: '❌' },
   login_failed:    { label: 'Falha de login',     color: '#ef4444',  icon: '❌' },
+  login_attempt:   { label: 'Tentativa suspeita', color: '#ef4444',  icon: '💉' },
   token_invalid:   { label: 'Token inválido',     color: '#f59e0b',  icon: '🔑' },
   priv_escalation: { label: 'Escalação de priv.', color: '#a855f7',  icon: '⬆️' },
 }
@@ -13,19 +14,39 @@ export default function IpInvestigation() {
   const [query, setQuery]   = useState('')
   const [ip, setIp]         = useState('')
   const [filterType, setFilterType] = useState('')
+  const [knownIps, setKnownIps]     = useState([])
+  const [rawEvents, setRawEvents]   = useState([])
+
+  // IPs conhecidos (dos logs) para sugestão/chips.
+  useEffect(() => {
+    let cancelado = false
+    fetch('/api/known-ips')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (!cancelado) setKnownIps(Array.isArray(d) ? d : []) })
+      .catch(() => { if (!cancelado) setKnownIps([]) })
+    return () => { cancelado = true }
+  }, [])
+
+  // Eventos do IP buscado.
+  useEffect(() => {
+    if (!ip) { setRawEvents([]); return }
+    let cancelado = false
+    fetch('/api/ip-events?ip=' + encodeURIComponent(ip))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (!cancelado) setRawEvents(Array.isArray(d) ? d : []) })
+      .catch(() => { if (!cancelado) setRawEvents([]) })
+    return () => { cancelado = true }
+  }, [ip])
 
   const events = useMemo(() => {
-    if (!ip) return []
-    const raw = MOCK_IP_EVENTS[ip] || []
-    const filtered = filterType ? raw.filter((e) => e.eventType === filterType) : raw
+    const filtered = filterType ? rawEvents.filter((e) => e.eventType === filterType) : rawEvents
     return [...filtered].sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt))
-  }, [ip, filterType])
+  }, [rawEvents, filterType])
 
-  const eventTypeCounts = useMemo(() => {
-    if (!ip) return {}
-    const raw = MOCK_IP_EVENTS[ip] || []
-    return raw.reduce((acc, e) => { acc[e.eventType] = (acc[e.eventType] || 0) + 1; return acc }, {})
-  }, [ip])
+  const eventTypeCounts = useMemo(
+    () => rawEvents.reduce((acc, e) => { acc[e.eventType] = (acc[e.eventType] || 0) + 1; return acc }, {}),
+    [rawEvents]
+  )
 
   function handleSearch(e) {
     e.preventDefault()
@@ -33,7 +54,7 @@ export default function IpInvestigation() {
     if (trimmed) setIp(trimmed)
   }
 
-  const suggestions = KNOWN_IPS.filter(
+  const suggestions = knownIps.filter(
     (k) => k.includes(query) && k !== query && query.length > 0
   )
 
@@ -70,11 +91,11 @@ export default function IpInvestigation() {
       </form>
 
       {/* Known IPs hint */}
-      {!ip && (
+      {!ip && knownIps.length > 0 && (
         <div className={styles.hintBox}>
-          <span className={styles.hintTitle}>IPs com eventos registrados nos mocks:</span>
+          <span className={styles.hintTitle}>IPs com eventos registrados nos logs:</span>
           <div className={styles.hintChips}>
-            {KNOWN_IPS.map((k) => (
+            {knownIps.map((k) => (
               <button
                 key={k}
                 className={styles.chip}
@@ -94,7 +115,7 @@ export default function IpInvestigation() {
           <div className={`card ${styles.ipSummary}`}>
             <div className={styles.ipTitle}>
               <span className={styles.ipAddr}>{ip}</span>
-              <span className={styles.ipTotal}>{(MOCK_IP_EVENTS[ip] || []).length} evento(s) total</span>
+              <span className={styles.ipTotal}>{rawEvents.length} evento(s) total</span>
             </div>
             <div className={styles.countChips}>
               {Object.entries(eventTypeCounts).map(([type, count]) => {
@@ -121,7 +142,7 @@ export default function IpInvestigation() {
           {/* Timeline */}
           {events.length === 0 ? (
             <div className={styles.empty}>
-              {MOCK_IP_EVENTS[ip] ? 'Nenhum evento corresponde ao filtro selecionado.' : `Nenhum evento encontrado para o IP "${ip}".`}
+              {rawEvents.length > 0 ? 'Nenhum evento corresponde ao filtro selecionado.' : `Nenhum evento encontrado para o IP "${ip}".`}
             </div>
           ) : (
             <div className={styles.timeline}>

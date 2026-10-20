@@ -15,12 +15,12 @@ Uso:
 """
 from datetime import datetime, timezone
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-DB_URL = "mysql+pymysql://root:1234@localhost:3306/banco_teste"
+DB_URL = "mysql+pymysql://root:root@localhost:3306/banco_teste"
 engine = create_engine(DB_URL)
 Session = sessionmaker(bind=engine)
 
@@ -180,5 +180,196 @@ def get_alerts():
         session.close()
 
 
+@app.route("/api/pentest", methods=["POST"])
+def run_pentest():
+    """Injeta os padrões de ataque do pentest.py no banco e devolve os alertas
+    que a detecção pegou logo em seguida. É o "Rodar Pentest" do dashboard:
+    o front chama isto e mostra quantos ataques foram detectados.
+
+    Body JSON opcional: {"clean": true} limpa auth_logs/measurements antes,
+    para uma rodada isolada (senão os ataques acumulam com os dados anteriores).
+    """
+    global _next_id
+    _next_id = 0
+
+    # pentest.py traz as mesmas rotinas de ataque usadas no terminal.
+    import pentest
+
+    body = request.get_json(silent=True) or {}
+    limpar = bool(body.get("clean"))
+
+    ataques = [
+        ("Movimentação Lateral", pentest.attack_movimentacao_lateral),
+        ("Força Bruta / Spray", pentest.attack_forca_bruta),
+        ("Exportação Massiva", pentest.attack_exportacao_massiva),
+        ("Enumeração de Tokens", pentest.attack_enumeracao_tokens),
+        ("Bloqueio de Conta", pentest.attack_lockout),
+        ("SQL Injection", pentest.attack_sql_injection),
+        ("Escalação de Privilégio", pentest.attack_escalacao_privilegio),
+    ]
+
+    inj_session = pentest.Session()
+    try:
+        if limpar:
+            pentest.clean_run_data(inj_session)
+        for _, fn in ataques:
+            fn(inj_session)
+        inj_session.commit()
+    except Exception as e:
+        inj_session.rollback()
+        return jsonify({"error": f"falha ao injetar ataques: {e}"}), 500
+    finally:
+        inj_session.close()
+
+    session = Session()
+    try:
+        alertas = coletar_alertas(session)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+    return jsonify({
+        "injected": [nome for nome, _ in ataques],
+        "injectedCount": len(ataques),
+        "detectedCount": len(alertas),
+        "cleaned": limpar,
+        "alerts": alertas,
+    })
+
+
+@app.route("/api/reset", methods=["POST"])
+def reset_panel():
+    """Zera o painel: limpa os logs/medições e tira usuários das janelas de
+    detecção (lockout e escalação), sem apagar usuários nem trocar papéis.
+    Deixa as 7 regras retornando zero — ponto de partida limpo para a demo.
+    """
+    session = Session()
+    try:
+        session.execute(text("DELETE FROM auth_logs"))
+        session.execute(text("DELETE FROM measurements"))
+        session.execute(text("UPDATE users SET locked_until = NULL, failed_attempts = 0"))
+        # Joga o updated_at dos admins para fora da janela de 24h da escalação.
+        session.execute(text("UPDATE users SET updated_at = (NOW() - INTERVAL 2 DAY) WHERE role = 'admin'"))
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        return jsonify({"error": f"falha ao zerar: {e}"}), 500
+    finally:
+        session.close()
+    return jsonify({"ok": True, "detectedCount": 0, "alerts": []})
+
+
+@app.route("/api/locked-accounts")
+def get_locked_accounts():
+    """Contas com lockout ativo (locked_until no futuro), com o último IP que
+    falhou login para cada uma."""
+    session = Session()
+    try:
+        rows = session.execute(text("""
+            SELECT u.id, u.username, u.role, u.failed_attempts, u.locked_until,
+                   (SELECT a.ip_address FROM auth_logs a
+                     WHERE a.user_id = u.id AND a.event_type = 'login_fail'
+                     ORDER BY a.occurred_at DESC LIMIT 1) AS last_ip
+            FROM users u
+            WHERE u.locked_until IS NOT NULL AND u.locked_until > NOW()
+            ORDER BY u.locked_until DESC
+        """)).fetchall()
+        return jsonify([{
+            "id": f"u{r.id}",
+            "username": r.username,
+            "role": r.role or "viewer",
+            "failedAttempts": r.failed_attempts or 0,
+            "lockedUntil": iso(r.locked_until),
+            "lastFailedIp": r.last_ip or "—",
+        } for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route("/api/known-ips")
+def get_known_ips():
+    """IPs que aparecem nos logs de auditoria (para busca/sugestão)."""
+    session = Session()
+    try:
+        rows = session.execute(text("""
+            SELECT ip_address, COUNT(*) AS c
+            FROM auth_logs
+            GROUP BY ip_address
+            ORDER BY c DESC
+            LIMIT 50
+        """)).fetchall()
+        return jsonify([r.ip_address for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
+_EVENT_DETALHE = {
+    "login_success": "Login bem-sucedido",
+    "login_fail": "Falha de login",
+    "token_invalid": "Token/API key inválido — possível enumeração",
+    "login_attempt": "Tentativa de login (payload suspeito no campo IP)",
+}
+
+
+@app.route("/api/ip-events")
+def get_ip_events():
+    """Linha do tempo de eventos de um IP (tela Investigar IP)."""
+    ip = request.args.get("ip", "").strip()
+    if not ip:
+        return jsonify([])
+    session = Session()
+    try:
+        rows = session.execute(text("""
+            SELECT a.id, a.event_type, a.occurred_at,
+                   u.username AS username, s.name AS store_name
+            FROM auth_logs a
+            LEFT JOIN users u ON u.id = a.user_id
+            LEFT JOIN stores s ON s.id = a.store_id
+            WHERE a.ip_address = :ip
+            ORDER BY a.occurred_at
+        """), {"ip": ip}).fetchall()
+        return jsonify([{
+            "id": f"e{r.id}",
+            "eventType": r.event_type,
+            "userId": r.username or "—",
+            "storeId": r.store_name or "—",
+            "occurredAt": iso(r.occurred_at),
+            "detail": _EVENT_DETALHE.get(r.event_type, r.event_type),
+        } for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route("/api/measurements")
+def get_measurements():
+    """Volume de medições por loja nas últimas 24h (tela Medições/Exportação)."""
+    session = Session()
+    try:
+        rows = session.execute(text("""
+            SELECT s.name AS store, COUNT(*) AS total
+            FROM measurements m JOIN stores s ON s.id = m.store_id
+            WHERE m.received_at >= (NOW() - INTERVAL 24 HOUR)
+            GROUP BY m.store_id, s.name
+            ORDER BY total DESC
+        """)).fetchall()
+        return jsonify([{
+            "store": r.store,
+            "measurements24h": r.total,
+            "baseline": 12,
+        } for r in rows])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()
+
+
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    # use_reloader=False: um processo só, encerra limpo quando o start.py para tudo.
+    app.run(port=5000, debug=True, use_reloader=False)

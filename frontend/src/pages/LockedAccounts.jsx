@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { MOCK_LOCKED_ACCOUNTS } from '../data/mockData'
 import styles from './LockedAccounts.module.css'
 
 function useCountdown(lockedUntil) {
@@ -47,18 +46,38 @@ function roleIcon(role) {
 }
 
 export default function LockedAccounts() {
+  const [accounts, setAccounts] = useState([])
+
+  useEffect(() => {
+    let cancelado = false
+    const carregar = () =>
+      fetch('/api/locked-accounts')
+        .then((r) => (r.ok ? r.json() : []))
+        .then((d) => { if (!cancelado) setAccounts(Array.isArray(d) ? d : []) })
+        .catch(() => { if (!cancelado) setAccounts([]) })
+    carregar()
+    const timer = setInterval(carregar, 5000)
+    return () => { cancelado = true; clearInterval(timer) }
+  }, [])
+
   return (
     <div className={styles.page}>
       <div className="page-header">
         <h1>Contas Bloqueadas</h1>
         <p>
-          {MOCK_LOCKED_ACCOUNTS.length} conta{MOCK_LOCKED_ACCOUNTS.length !== 1 ? 's' : ''} em lockout
+          {accounts.length} conta{accounts.length !== 1 ? 's' : ''} em lockout
           — contagem regressiva em tempo real
         </p>
       </div>
 
+      {accounts.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+          Nenhuma conta bloqueada no momento. Rode o pentest na aba “Alertas” para gerar um lockout.
+        </div>
+      )}
+
       <div className={styles.cardGrid}>
-        {MOCK_LOCKED_ACCOUNTS.map((user) => (
+        {accounts.map((user) => (
           <div key={user.id} className={`card ${styles.userCard}`}>
             <div className={styles.userHeader}>
               <span className={styles.userIcon}>{roleIcon(user.role)}</span>
@@ -109,7 +128,13 @@ export default function LockedAccounts() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_LOCKED_ACCOUNTS.map((user) => (
+              {accounts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
+                    Nenhuma conta bloqueada.
+                  </td>
+                </tr>
+              ) : accounts.map((user) => (
                 <tr key={user.id}>
                   <td className="td-mono">{user.username}</td>
                   <td className="td-muted">{roleIcon(user.role)} {user.role}</td>

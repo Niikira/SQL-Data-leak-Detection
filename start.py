@@ -26,6 +26,7 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -38,7 +39,7 @@ PY = str(VENV / ("Scripts/python.exe" if IS_WIN else "bin/python"))
 # Mesmos dados de conexão usados nos scripts do projeto.
 DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME = "localhost", 3306, "root", "root", "banco_teste"
 
-COLORS = {"backend": "\033[96m", "frontend": "\033[95m", "start": "\033[92m"}
+COLORS = {"backend": "\033[96m", "frontend": "\033[95m", "start": "\033[92m", "api": "\033[93m"}
 RESET = "\033[0m"
 
 procs: list[subprocess.Popen] = []
@@ -105,7 +106,7 @@ def ensure_python_deps():
         log("start", "Criando ambiente virtual Python (.venv)...")
         if run_blocking([sys.executable, "-m", "venv", str(VENV)], ROOT, "start") != 0:
             sys.exit("Falha ao criar o .venv (no Debian/Ubuntu: sudo apt install python3-venv).")
-    check = subprocess.run([PY, "-c", "import sqlalchemy, pymysql, cryptography"],
+    check = subprocess.run([PY, "-c", "import sqlalchemy, pymysql, cryptography, flask, flask_cors"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if check.returncode == 0:
         return
@@ -182,6 +183,14 @@ def monitor_loop(interval):
 
 # --------------------------------------------------------------------------- main
 def main():
+    # No Windows o console costuma usar cp1252; a saída dos filhos (Vite, etc.)
+    # traz caracteres UTF-8 (➜, acentos) que quebrariam o print. Força UTF-8.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     ap = argparse.ArgumentParser(description="Sobe backend + frontend com um comando.")
     ap.add_argument("--interval", type=int, default=30)
     ap.add_argument("--reseed", action="store_true")
@@ -209,11 +218,30 @@ def main():
 
     if not args.no_backend:
         threading.Thread(target=monitor_loop, args=(args.interval,), daemon=True).start()
+        # Sobe a API de alertas (porta 5000) — é o que faz o botão de pentest
+        # e os dados reais do dashboard funcionarem.
+        spawn([PY, "api.py"], ROOT, "api")
+        log("start", "API de alertas em http://localhost:5000")
 
     fe = None
     if not args.no_frontend:
         fe = spawn([NPM, "run", "dev"], FRONTEND, "frontend")
         log("start", "Frontend em http://localhost:5173  (Ctrl+C para parar)")
+
+        # Abre o navegador sozinho assim que o frontend responder.
+        def abrir_navegador():
+            for _ in range(40):
+                if stopping.is_set():
+                    return
+                try:
+                    with socket.create_connection(("localhost", 5173), timeout=1):
+                        break
+                except OSError:
+                    time.sleep(1)
+            if not stopping.is_set():
+                webbrowser.open("http://localhost:5173")
+
+        threading.Thread(target=abrir_navegador, daemon=True).start()
 
     try:
         if fe:
