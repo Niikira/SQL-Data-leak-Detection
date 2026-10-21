@@ -1,37 +1,52 @@
 import React, { useState, useEffect } from 'react'
+import Icon from '../components/Icon'
+import PageHeader, { StatusPill } from '../components/PageHeader'
+import { getJson } from '../lib/api'
 import styles from './LockedAccounts.module.css'
-
-function useCountdown(lockedUntil) {
-  const [remaining, setRemaining] = useState(getRemainingMs(lockedUntil))
-
-  useEffect(() => {
-    const id = setInterval(() => setRemaining(getRemainingMs(lockedUntil)), 1000)
-    return () => clearInterval(id)
-  }, [lockedUntil])
-
-  return remaining
-}
 
 function getRemainingMs(iso) {
   return Math.max(0, new Date(iso) - Date.now())
 }
 
+function useRemaining(lockedUntil) {
+  const [remaining, setRemaining] = useState(getRemainingMs(lockedUntil))
+  useEffect(() => {
+    const id = setInterval(() => setRemaining(getRemainingMs(lockedUntil)), 1000)
+    return () => clearInterval(id)
+  }, [lockedUntil])
+  return remaining
+}
+
 function fmtMs(ms) {
-  if (ms <= 0) return 'Expirado'
+  if (ms <= 0) return 'liberada'
   const totalSec = Math.floor(ms / 1000)
   const h = Math.floor(totalSec / 3600)
   const m = Math.floor((totalSec % 3600) / 60)
   const s = totalSec % 60
-  const parts = []
-  if (h > 0) parts.push(`${h}h`)
-  parts.push(`${String(m).padStart(2, '0')}m`)
-  parts.push(`${String(s).padStart(2, '0')}s`)
-  return parts.join(' ')
+  const mmss = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return h > 0 ? `${h}:${mmss}` : mmss
 }
 
-function CountdownCell({ lockedUntil }) {
-  const ms = useCountdown(lockedUntil)
-  const urgent = ms < 10 * 60 * 1000 && ms > 0  // < 10 min
+function fmtLock(iso) {
+  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+const ROLES = {
+  admin:   { label: 'Administrador', icon: 'crown' },
+  manager: { label: 'Gerente',       icon: 'briefcase' },
+}
+function roleMeta(role) {
+  return ROLES[role] || { label: 'Usuário', icon: 'user' }
+}
+
+function initials(name) {
+  const parts = String(name).split(/[_\s.-]+/).filter(Boolean)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '')).toUpperCase()
+}
+
+function Countdown({ lockedUntil }) {
+  const ms = useRemaining(lockedUntil)
+  const urgent = ms > 0 && ms < 5 * 60 * 1000
   return (
     <span className={`${styles.countdown} ${urgent ? styles.urgent : ''} ${ms === 0 ? styles.expired : ''}`}>
       {fmtMs(ms)}
@@ -39,22 +54,30 @@ function CountdownCell({ lockedUntil }) {
   )
 }
 
-function roleIcon(role) {
-  if (role === 'admin')   return '👑'
-  if (role === 'manager') return '🏢'
-  return '👤'
+function LockProgress({ lockedUntil }) {
+  // Sem a duração original no banco, usa como referência o maior entre o
+  // restante visto ao abrir a tela e 15 min (o lockout do pentest).
+  const [total] = useState(() => Math.max(getRemainingMs(lockedUntil), 15 * 60 * 1000))
+  const remaining = useRemaining(lockedUntil)
+  const pct = Math.min(100, Math.round(((total - remaining) / total) * 100))
+  return (
+    <div className={styles.progressWrap}>
+      <div className={styles.progressBar}><div className={styles.progressFill} style={{ width: `${pct}%` }} /></div>
+      <span className={styles.progressLabel}>{pct}% do bloqueio cumprido</span>
+    </div>
+  )
 }
 
 export default function LockedAccounts() {
   const [accounts, setAccounts] = useState([])
+  const [online, setOnline]     = useState(null)
 
   useEffect(() => {
     let cancelado = false
     const carregar = () =>
-      fetch('/api/locked-accounts')
-        .then((r) => (r.ok ? r.json() : []))
-        .then((d) => { if (!cancelado) setAccounts(Array.isArray(d) ? d : []) })
-        .catch(() => { if (!cancelado) setAccounts([]) })
+      getJson('/api/locked-accounts')
+        .then((d) => { if (!cancelado) { setAccounts(Array.isArray(d) ? d : []); setOnline(true) } })
+        .catch(() => { if (!cancelado) setOnline(false) })
     carregar()
     const timer = setInterval(carregar, 5000)
     return () => { cancelado = true; clearInterval(timer) }
@@ -62,131 +85,96 @@ export default function LockedAccounts() {
 
   return (
     <div className={styles.page}>
-      <div className="page-header">
-        <h1>Contas Bloqueadas</h1>
-        <p>
-          {accounts.length} conta{accounts.length !== 1 ? 's' : ''} em lockout
-          — contagem regressiva em tempo real
-        </p>
-      </div>
+      <PageHeader eyebrow="03 — Contenção" title="Contas bloqueadas">
+        <StatusPill online={online} />
+        <span>{accounts.length} conta{accounts.length !== 1 ? 's' : ''} em lockout · contagem em tempo real</span>
+      </PageHeader>
 
-      {accounts.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
-          Nenhuma conta bloqueada no momento. Rode o pentest na aba “Alertas” para gerar um lockout.
-        </div>
-      )}
-
-      <div className={styles.cardGrid}>
-        {accounts.map((user) => (
-          <div key={user.id} className={`card ${styles.userCard}`}>
-            <div className={styles.userHeader}>
-              <span className={styles.userIcon}>{roleIcon(user.role)}</span>
-              <div className={styles.userInfo}>
-                <span className={styles.userName}>{user.username}</span>
-                <span className={styles.userRole}>{user.role}</span>
-              </div>
-              <span className={`badge badge-ALTA`} style={{ marginLeft: 'auto' }}>Bloqueado</span>
-            </div>
-
-            <div className={styles.userStats}>
-              <StatRow icon="❌" label="Tentativas falhas" value={user.failedAttempts} />
-              <StatRow icon="🌐" label="Último IP suspeito" value={user.lastFailedIp} mono />
-              <StatRow
-                icon="🕒"
-                label="Bloqueado até"
-                value={new Date(user.lockedUntil).toLocaleString('pt-BR', {
-                  day: '2-digit', month: '2-digit',
-                  hour: '2-digit', minute: '2-digit',
-                })}
-              />
-            </div>
-
-            <div className={styles.countdownWrap}>
-              <span className={styles.countdownLabel}>Tempo restante</span>
-              <CountdownCell lockedUntil={user.lockedUntil} />
-            </div>
-
-            {/* Progress bar */}
-            <LockProgress lockedUntil={user.lockedUntil} />
+      {accounts.length === 0 ? (
+        <div className="card">
+          <div className="empty-state">
+            <span className="empty-icon"><Icon name="lock" size={18} /></span>
+            <strong>Nenhuma conta bloqueada</strong>
+            Rode o pentest na aba Alertas para provocar um lockout por força bruta.
           </div>
-        ))}
-      </div>
-
-      {/* Summary table */}
-      <div className={`card ${styles.tableCard}`}>
-        <h2 className={styles.tableTitle}>Resumo de lockouts</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Usuário</th>
-                <th>Role</th>
-                <th>Tentativas falhas</th>
-                <th>Último IP</th>
-                <th>Bloqueado até</th>
-                <th>Restante</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
-                    Nenhuma conta bloqueada.
-                  </td>
-                </tr>
-              ) : accounts.map((user) => (
-                <tr key={user.id}>
-                  <td className="td-mono">{user.username}</td>
-                  <td className="td-muted">{roleIcon(user.role)} {user.role}</td>
-                  <td style={{ color: 'var(--sev-high)', fontWeight: 700 }}>{user.failedAttempts}</td>
-                  <td className="td-mono">{user.lastFailedIp}</td>
-                  <td className="td-muted">
-                    {new Date(user.lockedUntil).toLocaleString('pt-BR', {
-                      day: '2-digit', month: '2-digit',
-                      hour: '2-digit', minute: '2-digit',
-                    })}
-                  </td>
-                  <td><CountdownCell lockedUntil={user.lockedUntil} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      </div>
-    </div>
-  )
-}
+      ) : (
+        <>
+          <div className={styles.cardGrid}>
+            {accounts.map((user) => {
+              const role = roleMeta(user.role)
+              return (
+                <article key={user.id} className={`card ${styles.userCard}`}>
+                  <header className={styles.userHead}>
+                    <span className={styles.avatar}>{initials(user.username)}</span>
+                    <div className={styles.userInfo}>
+                      <span className={styles.userName}>{user.username}</span>
+                      <span className={styles.userRole}><Icon name={role.icon} size={12} />{role.label}</span>
+                    </div>
+                    <span className="badge badge-ALTA">Bloqueada</span>
+                  </header>
 
-function StatRow({ icon, label, value, mono }) {
-  return (
-    <div className={styles.statRow}>
-      <span className={styles.statIcon}>{icon}</span>
-      <span className={styles.statLabel}>{label}</span>
-      <span className={`${styles.statValue} ${mono ? 'td-mono' : ''}`}>{value}</span>
-    </div>
-  )
-}
+                  <div className={styles.countdownBox}>
+                    <span className={styles.countLabel}>Desbloqueio em</span>
+                    <Countdown lockedUntil={user.lockedUntil} />
+                  </div>
+                  <LockProgress lockedUntil={user.lockedUntil} />
 
-function LockProgress({ lockedUntil }) {
-  // Assume lockouts last 120 min from now — show how much has elapsed
-  const total = 120 * 60 * 1000
-  const [remaining, setRemaining] = useState(getRemainingMs(lockedUntil))
+                  <dl className={styles.facts}>
+                    <div>
+                      <dt><Icon name="xCircle" size={14} />Tentativas falhas</dt>
+                      <dd className={styles.failCount}>{user.failedAttempts}</dd>
+                    </div>
+                    <div>
+                      <dt><Icon name="globe" size={14} />Último IP suspeito</dt>
+                      <dd className="td-mono">{user.lastFailedIp}</dd>
+                    </div>
+                    <div>
+                      <dt><Icon name="clock" size={14} />Bloqueada até</dt>
+                      <dd className="td-mono">{fmtLock(user.lockedUntil)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              )
+            })}
+          </div>
 
-  useEffect(() => {
-    const id = setInterval(() => setRemaining(getRemainingMs(lockedUntil)), 1000)
-    return () => clearInterval(id)
-  }, [lockedUntil])
-
-  const pct = Math.round(((total - remaining) / total) * 100)
-  return (
-    <div className={styles.progressWrap}>
-      <div className={styles.progressBar}>
-        <div
-          className={styles.progressFill}
-          style={{ width: `${Math.min(pct, 100)}%` }}
-        />
-      </div>
-      <span className={styles.progressLabel}>{Math.min(pct, 100)}% do período de bloqueio decorrido</span>
+          <div className="card card-flush">
+            <div className={styles.tableHead}><div className="card-title">Resumo de lockouts</div></div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Usuário</th>
+                    <th>Perfil</th>
+                    <th>Falhas</th>
+                    <th>Último IP</th>
+                    <th>Bloqueada até</th>
+                    <th>Restante</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.map((user) => {
+                    const role = roleMeta(user.role)
+                    return (
+                      <tr key={user.id}>
+                        <td className="td-mono">{user.username}</td>
+                        <td className="td-muted">
+                          <span className={styles.roleCell}><Icon name={role.icon} size={13} />{role.label}</span>
+                        </td>
+                        <td className={`td-mono ${styles.failCount}`}>{user.failedAttempts}</td>
+                        <td className="td-mono">{user.lastFailedIp}</td>
+                        <td className="td-mono td-muted">{fmtLock(user.lockedUntil)}</td>
+                        <td><Countdown lockedUntil={user.lockedUntil} /></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
