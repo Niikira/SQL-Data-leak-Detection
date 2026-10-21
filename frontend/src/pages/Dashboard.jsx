@@ -1,108 +1,89 @@
 import React, { useMemo, useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import Icon from '../components/Icon'
+import PageHeader, { StatusPill } from '../components/PageHeader'
+import { typeMeta, SEV_COLOR, fmtDateTime, fmtTime } from '../lib/meta'
+import { getJson, postJson, msgErro } from '../lib/api'
 import styles from './Dashboard.module.css'
 
-const ALERT_TYPES = [
-  { key: 'LATERAL_MOVEMENT', label: 'Movimentação Lateral' },
-  { key: 'BRUTE_FORCE',      label: 'Força Bruta' },
-  { key: 'PASSWORD_SPRAY',   label: 'Password Spray' },
-  { key: 'TOKEN_ENUM',       label: 'Enumeração de Tokens' },
-  { key: 'ACCOUNT_LOCKOUT',  label: 'Bloqueio de Conta' },
-  { key: 'DATA_EXPORT',      label: 'Exportação Massiva' },
-  { key: 'WEAK_HASH',        label: 'Hash Fraco / TOTP' },
-  { key: 'SHORT_TOTP',       label: 'TOTP Curto' },
-  { key: 'SQL_INJECTION',    label: 'SQL Injection' },
-  { key: 'OFF_HOURS',        label: 'Acesso Fora de Horário' },
-  { key: 'PRIV_ESCALATION',  label: 'Escalação de Privilégio' },
+const SEVERIDADES = [
+  { key: 'ALTA',  label: 'Alta',  caption: 'exigem ação imediata' },
+  { key: 'MÉDIA', label: 'Média', caption: 'monitorar de perto' },
+  { key: 'BAIXA', label: 'Baixa', caption: 'registradas para auditoria' },
 ]
 
-const CustomTooltip = ({ active, payload, label }) => {
+const GAUGE_TICKS = 20
+
+// Índice simples: alta pesa 3, média 2, baixa 1.
+function nivelDeAmeaca(counts) {
+  const score = counts.ALTA * 3 + counts['MÉDIA'] * 2 + counts.BAIXA
+  if (score === 0) {
+    return { label: 'Estável', color: 'var(--ok)', score, desc: 'Nenhuma anomalia ativa nas janelas de detecção.' }
+  }
+  if (score < 8) {
+    return { label: 'Atenção', color: 'var(--sev-med)', score, desc: 'Há sinais suspeitos nos logs — vale investigar.' }
+  }
+  return { label: 'Crítico', color: 'var(--sev-high)', score, desc: 'Padrões de ataque ativos detectados no banco.' }
+}
+
+const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
     <div className={styles.tooltip}>
       <p className={styles.tooltipLabel}>{label}</p>
       {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color }}>
-          {p.name}: <strong>{p.value}</strong>
+        <p key={p.name}>
+          <i style={{ background: p.color }} />
+          {p.name.toLowerCase()} <strong>{p.value}</strong>
         </p>
       ))}
     </div>
   )
 }
 
-// POST que trata resposta vazia/HTML (API fora do ar) sem estourar "JSON.parse".
-async function postJson(url, body) {
-  const opt = body
-    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    : { method: 'POST' }
-  const r = await fetch(url, opt)
-  const txt = await r.text()
-  if (!r.ok) throw new Error('API-OFFLINE')
-  if (!txt.trim()) throw new Error('API-OFFLINE')
-  let data
-  try { data = JSON.parse(txt) } catch { throw new Error('API-OFFLINE') }
-  if (data && data.error) throw new Error(data.error)
-  return data
-}
-
-// Transforma qualquer falha de rede/parse numa dica acionável.
-function msgErro(e) {
-  const m = String((e && e.message) || e)
-  if (m === 'API-OFFLINE' || m.includes('Failed to fetch') || m.includes('NetworkError') || m.includes('JSON')) {
-    return 'Não consegui falar com a API. Confira se o MySQL está ligado (usuário root, senha root) e reinicie pelo iniciar.bat.'
-  }
-  return m
-}
-
 export default function Dashboard() {
   // Começa zerado; só enche com o que a API real detectar (ex.: após o pentest).
   const [alerts, setAlerts] = useState([])
-
-  useEffect(() => {
-    let cancelado = false
-    const carregar = () =>
-      fetch('/api/alerts')
-        .then((r) => (r.ok ? r.json() : []))
-        .then((data) => { if (!cancelado) setAlerts(Array.isArray(data) ? data : []) })
-        .catch(() => { if (!cancelado) setAlerts([]) })
-    carregar()
-    // Atualiza sozinho a cada 5s, então rodar o pentest reflete aqui sem recarregar.
-    const timer = setInterval(carregar, 5000)
-    return () => { cancelado = true; clearInterval(timer) }
-  }, [])
-
-  const [busy, setBusy]     = useState(false)
+  const [online, setOnline] = useState(null)
+  const [busy, setBusy]     = useState(false)   // false | 'pentest' | 'reset'
   const [aviso, setAviso]   = useState(null)
 
   function refetch() {
-    return fetch('/api/alerts')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setAlerts(Array.isArray(data) ? data : []))
-      .catch(() => {})
+    return getJson('/api/alerts')
+      .then((data) => { setAlerts(Array.isArray(data) ? data : []); setOnline(true) })
+      .catch(() => setOnline(false))
   }
+
+  useEffect(() => {
+    refetch()
+    // Atualiza sozinho a cada 5s, então rodar o pentest reflete aqui sem recarregar.
+    const timer = setInterval(refetch, 5000)
+    return () => clearInterval(timer)
+  }, [])
 
   function rodarPentest() {
     if (busy) return
-    setBusy(true); setAviso(null)
+    setBusy('pentest'); setAviso(null)
     postJson('/api/pentest', { clean: true })
       .then((res) => {
         setAlerts(res.alerts || [])
-        setAviso({ ok: true, msg: `✅ ${res.injectedCount} ataques injetados — ${res.detectedCount} alertas detectados.` })
+        setOnline(true)
+        setAviso({ ok: true, msg: `${res.injectedCount} técnicas injetadas · ${res.detectedCount} alertas detectados` })
       })
-      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + msgErro(e) }))
+      .catch((e) => setAviso({ ok: false, msg: msgErro(e) }))
       .finally(() => setBusy(false))
   }
 
   function zerarPainel() {
     if (busy) return
-    setBusy(true); setAviso(null)
+    setBusy('reset'); setAviso(null)
     postJson('/api/reset')
       .then(() => refetch())
-      .then(() => setAviso({ ok: true, msg: '🧹 Painel zerado. Rode o pentest para gerar detecções.' }))
-      .catch((e) => setAviso({ ok: false, msg: '⚠️ ' + msgErro(e) }))
+      .then(() => setAviso({ ok: true, msg: 'painel zerado · pronto para uma nova simulação' }))
+      .catch((e) => setAviso({ ok: false, msg: msgErro(e) }))
       .finally(() => setBusy(false))
   }
 
@@ -113,183 +94,237 @@ export default function Dashboard() {
     total: alerts.length,
   }), [alerts])
 
-  const typeCounts = useMemo(() => {
+  const nivel = nivelDeAmeaca(counts)
+  const ticksOn = nivel.score === 0 ? 0 : Math.max(1, Math.min(GAUGE_TICKS, Math.round((nivel.score / 24) * GAUGE_TICKS)))
+
+  const typeRows = useMemo(() => {
     const map = {}
     alerts.forEach((a) => { map[a.type] = (map[a.type] || 0) + 1 })
-    return map
+    const max = Math.max(1, ...Object.values(map))
+    return Object.entries(map)
+      .map(([type, count]) => ({ type, count, pct: (count / max) * 100, ...typeMeta(type) }))
+      .sort((a, b) => b.count - a.count)
   }, [alerts])
 
   const overTime = useMemo(() => buildOverTime(alerts), [alerts])
 
   const recentAlerts = useMemo(
-    () => [...alerts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5),
+    () => [...alerts].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 6),
     [alerts]
   )
+  const ultima = recentAlerts[0]?.timestamp
 
   return (
     <div className={styles.page}>
-      {/* ── Demo: pentest / zerar ─────────────────────────────────────── */}
-      <div className={styles.demoBar}>
-        <div>
-          <strong>Simulado de pentest</strong>
-          <span className={styles.demoHint}> — zere o painel, rode o pentest e veja os números subirem.</span>
-        </div>
-        <div className={styles.demoBtns}>
-          <button className="btn" onClick={rodarPentest} disabled={busy}>
-            {busy ? '⏳ Processando…' : '🔴 Rodar Pentest'}
-          </button>
-          <button className="btn" onClick={zerarPainel} disabled={busy}>
-            🧹 Zerar painel
-          </button>
-        </div>
-      </div>
-      {aviso && (
-        <div className={`${styles.demoAviso} ${aviso.ok ? styles.avisoOk : styles.avisoErr}`}>
-          {aviso.msg}
+      <PageHeader eyebrow="01 — Visão geral" title="Centro de detecção">
+        <StatusPill online={online} />
+        <span>Varredura da trilha de auditoria · atualiza a cada 5 s</span>
+      </PageHeader>
+
+      {online === false && (
+        <div className="notice notice-err">
+          <Icon name="alert" size={16} />
+          <div>
+            <strong>A API não está respondendo.</strong>{' '}
+            <span>Confira se o MySQL está ligado (usuário e senha do db_config.py) e reinicie pelo iniciar.bat.</span>
+          </div>
         </div>
       )}
 
-      {/* ── Summary cards ─────────────────────────────────────────────── */}
-      <div className={styles.summaryGrid}>
-        <SummaryCard
-          label="Total de Alertas"
-          value={counts.total}
-          sub="últimas 24h"
-          color="var(--text-primary)"
-          bg="var(--bg-elevated)"
-          icon="🔔"
-        />
-        <SummaryCard
-          label="Severidade ALTA"
-          value={counts.ALTA}
-          sub="requerem ação imediata"
-          color="var(--sev-high)"
-          bg="var(--sev-high-bg)"
-          icon="🔴"
-        />
-        <SummaryCard
-          label="Severidade MÉDIA"
-          value={counts.MÉDIA}
-          sub="monitorar de perto"
-          color="var(--sev-med)"
-          bg="var(--sev-med-bg)"
-          icon="🟡"
-        />
-        <SummaryCard
-          label="Severidade BAIXA"
-          value={counts.BAIXA}
-          sub="registradas para auditoria"
-          color="var(--sev-low)"
-          bg="var(--sev-low-bg)"
-          icon="🔵"
-        />
-      </div>
+      {/* ── Nível de ameaça + console ─────────────────────────────────── */}
+      <section className={styles.hero}>
+        <div className={`card ${styles.threat}`} style={{ '--level': nivel.color }}>
+          <div className="card-title">Nível de ameaça</div>
+          <div className={styles.threatMain}>
+            <span className={styles.threatLabel}>{nivel.label}</span>
+            <span className={styles.threatScore}>índice {String(nivel.score).padStart(2, '0')}</span>
+          </div>
+          <div className={styles.gauge} aria-hidden="true">
+            {Array.from({ length: GAUGE_TICKS }, (_, i) => (
+              <span key={i} className={`${styles.tick} ${i < ticksOn ? styles.tickOn : ''}`} />
+            ))}
+          </div>
+          <p className={styles.threatDesc}>{nivel.desc}</p>
+          <div className={styles.threatFoot}>
+            <span><strong>{counts.total}</strong> alertas ativos</span>
+            <span>última detecção <strong>{ultima ? fmtTime(ultima) : '—'}</strong></span>
+          </div>
+        </div>
 
-      {/* ── Chart row ─────────────────────────────────────────────────── */}
-      <div className={styles.chartRow}>
-        {/* Area chart — alertas ao longo do tempo */}
-        <div className={`card ${styles.chartCard}`}>
-          <h2 className={styles.cardTitle}>Alertas ao longo do tempo (hoje)</h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={overTime} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
+        <div className={`card ${styles.console}`}>
+          <div className="card-title">Console de simulação</div>
+          <p className={styles.consoleText}>
+            Grava no banco os rastros que um invasor deixaria — movimentação lateral, força bruta,
+            SQL injection e mais quatro técnicas — e deixa a detecção trabalhar.
+          </p>
+          <div className={styles.consoleActions}>
+            <button className="btn btn-danger" onClick={rodarPentest} disabled={!!busy}>
+              <Icon name={busy === 'pentest' ? 'loader' : 'zap'} size={15} className={busy === 'pentest' ? 'spin' : undefined} />
+              {busy === 'pentest' ? 'Executando…' : 'Rodar pentest'}
+            </button>
+            <button className="btn" onClick={zerarPainel} disabled={!!busy}>
+              <Icon name={busy === 'reset' ? 'loader' : 'rotate'} size={15} className={busy === 'reset' ? 'spin' : undefined} />
+              Zerar painel
+            </button>
+          </div>
+          <div className={styles.consoleLog} data-state={aviso ? (aviso.ok ? 'ok' : 'err') : 'idle'}>
+            <span className={styles.prompt}>$</span>
+            <span>
+              {busy ? (busy === 'pentest' ? 'injetando ataques…' : 'limpando registros…') : aviso ? aviso.msg : 'aguardando comando'}
+              {!busy && !aviso && <span className={styles.cursor} />}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Contadores ────────────────────────────────────────────────── */}
+      <section className={styles.stats}>
+        <StatCard label="Total" value={counts.total} caption="nas janelas de detecção" color="var(--accent)" />
+        {SEVERIDADES.map((s) => (
+          <StatCard
+            key={s.key}
+            label={s.label}
+            value={counts[s.key]}
+            caption={s.caption}
+            color={SEV_COLOR[s.key]}
+            share={counts.total ? counts[s.key] / counts.total : 0}
+          />
+        ))}
+      </section>
+
+      {/* ── Linha do tempo + técnicas ─────────────────────────────────── */}
+      <section className={styles.chartRow}>
+        <div className="card">
+          <div className={styles.cardHead}>
+            <div className="card-title">Linha do tempo · hoje</div>
+            <div className={styles.legend}>
+              {SEVERIDADES.map((s) => (
+                <span key={s.key}><i style={{ background: SEV_COLOR[s.key] }} />{s.label}</span>
+              ))}
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={230}>
+            <AreaChart data={overTime} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
               <defs>
-                <linearGradient id="gradAlta" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="var(--chart-high)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--chart-high)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradMedia" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="var(--chart-med)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--chart-med)" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradBaixa" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="var(--chart-low)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--chart-low)" stopOpacity={0} />
-                </linearGradient>
+                {SEVERIDADES.map((s) => (
+                  <linearGradient key={s.key} id={`grad-${s.label}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={SEV_COLOR[s.key]} stopOpacity={0.28} />
+                    <stop offset="100%" stopColor={SEV_COLOR[s.key]} stopOpacity={0} />
+                  </linearGradient>
+                ))}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="hour" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
-              <YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)' }} />
-              <Area type="monotone" dataKey="ALTA"  stroke="var(--chart-high)" fill="url(#gradAlta)"  strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="MÉDIA" stroke="var(--chart-med)"  fill="url(#gradMedia)" strokeWidth={2} dot={false} />
-              <Area type="monotone" dataKey="BAIXA" stroke="var(--chart-low)"  fill="url(#gradBaixa)" strokeWidth={2} dot={false} />
+              <CartesianGrid strokeDasharray="2 6" stroke="var(--border-strong)" vertical={false} />
+              <XAxis dataKey="hour" tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'var(--font-mono)' }} allowDecimals={false} axisLine={false} tickLine={false} />
+              <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border-strong)' }} />
+              {SEVERIDADES.map((s) => (
+                <Area
+                  key={s.key}
+                  type="monotone"
+                  dataKey={s.key}
+                  name={s.label}
+                  stroke={SEV_COLOR[s.key]}
+                  fill={`url(#grad-${s.label})`}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0 }}
+                />
+              ))}
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Alert type breakdown */}
-        <div className={`card ${styles.typeCard}`}>
-          <h2 className={styles.cardTitle}>Por tipo de alerta</h2>
-          <div className={styles.typeList}>
-            {ALERT_TYPES.map((t) => {
-              const count = typeCounts[t.key] || 0
-              if (count === 0) return null
-              const max = Math.max(...Object.values(typeCounts))
-              const pct = Math.round((count / max) * 100)
-              return (
-                <div key={t.key} className={styles.typeRow}>
-                  <span className={styles.typeLabel}>{t.label}</span>
-                  <div className={styles.typeBar}>
-                    <div className={styles.typeBarFill} style={{ width: `${pct}%` }} />
+        <div className="card">
+          <div className="card-title">Por técnica de ataque</div>
+          {typeRows.length === 0 ? (
+            <div className="empty-state">
+              <span className="empty-icon"><Icon name="target" size={18} /></span>
+              <strong>Nenhuma técnica detectada</strong>
+              Rode o pentest para ver o que a detecção captura.
+            </div>
+          ) : (
+            <div className={styles.typeList}>
+              {typeRows.map((t) => (
+                <div key={t.type} className={styles.typeRow}>
+                  <span className={styles.typeIcon}><Icon name={t.icon} size={14} /></span>
+                  <div className={styles.typeBody}>
+                    <div className={styles.typeLabel}>{t.label}</div>
+                    <div className={styles.typeBar}><span style={{ width: `${t.pct}%` }} /></div>
                   </div>
-                  <span className={styles.typeCount}>{count}</span>
+                  <span className={styles.typeCount}>{t.count}</span>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* ── Recent alerts ─────────────────────────────────────────────── */}
-      <div className={`card ${styles.recentCard}`}>
-        <h2 className={styles.cardTitle}>Alertas recentes</h2>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Severidade</th>
-                <th>Tipo</th>
-                <th>Alvo</th>
-                <th>Detalhes</th>
-                <th>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentAlerts.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
-                    Nenhum alerta no momento. Rode o pentest na aba “Alertas” para gerar detecções.
-                  </td>
-                </tr>
-              ) : (
-                recentAlerts.map((a) => (
-                  <tr key={a.id}>
-                    <td><span className={`badge badge-${a.severity}`}>{a.severity}</span></td>
-                    <td className="td-muted">{a.typeLabel}</td>
-                    <td className="td-mono">{a.target}</td>
-                    <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.details}</td>
-                    <td className="td-muted" style={{ whiteSpace: 'nowrap' }}>{fmtTs(a.timestamp)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* ── Detecções recentes ────────────────────────────────────────── */}
+      <section className="card card-flush">
+        <div className={`${styles.cardHead} ${styles.cardHeadPad}`}>
+          <div className="card-title">Detecções recentes</div>
+          <Link to="/alerts" className={styles.seeAll}>
+            ver todas <Icon name="chevronRight" size={14} />
+          </Link>
         </div>
-      </div>
+        {recentAlerts.length === 0 ? (
+          <div className="empty-state">
+            <span className="empty-icon"><Icon name="bell" size={18} /></span>
+            <strong>Silêncio nos logs</strong>
+            Nenhum alerta no momento. Use o console acima para simular um ataque.
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Severidade</th>
+                  <th>Técnica</th>
+                  <th>Alvo</th>
+                  <th>Detalhes</th>
+                  <th>Horário</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentAlerts.map((a) => {
+                  const meta = typeMeta(a.type, a.typeLabel)
+                  return (
+                    <tr key={a.id}>
+                      <td><span className={`badge badge-${a.severity}`}>{a.severity}</span></td>
+                      <td>
+                        <span className={styles.typeCell} style={{ '--c': SEV_COLOR[a.severity] }}>
+                          <Icon name={meta.icon} size={14} />
+                          {a.typeLabel || meta.label}
+                        </span>
+                      </td>
+                      <td className="td-mono">{a.target}</td>
+                      <td className={styles.detailCell}>{a.details}</td>
+                      <td className="td-mono td-muted" style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(a.timestamp)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
 
-function SummaryCard({ label, value, sub, color, bg, icon }) {
+function StatCard({ label, value, caption, color, share }) {
+  const temShare = typeof share === 'number'
   return (
-    <div className={styles.summaryCard} style={{ background: bg, borderColor: color + '44' }}>
-      <div className={styles.summaryTop}>
-        <span className={styles.summaryIcon}>{icon}</span>
-        <span className={styles.summaryValue} style={{ color }}>{value}</span>
+    <div className={styles.stat} style={{ '--c': color }}>
+      <div className={styles.statHead}>
+        <span className={styles.statLabel}><i className={styles.statDot} />{label}</span>
+        {temShare && <span className={styles.statPct}>{Math.round(share * 100)}%</span>}
       </div>
-      <div className={styles.summaryLabel}>{label}</div>
-      <div className={styles.summarySub}>{sub}</div>
+      <div className={`${styles.statValue} ${value === 0 ? styles.statZero : ''}`}>{value}</div>
+      <div className={styles.statCaption}>{caption}</div>
+      <div className={styles.statBar}>
+        <span style={{ width: `${temShare ? share * 100 : value > 0 ? 100 : 0}%` }} />
+      </div>
     </div>
   )
 }
@@ -314,11 +349,4 @@ function buildOverTime(alerts) {
     })
   }
   return rows
-}
-
-function fmtTs(iso) {
-  return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  })
 }

@@ -1,80 +1,94 @@
-.page { display: flex; flex-direction: column; gap: 20px; }
+.page { display: flex; flex-direction: column; gap: 18px; }
 
-/* Cards grid */
 .cardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
 }
 
-.userCard { display: flex; flex-direction: column; gap: 14px; }
-
-.userHeader {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.userCard { display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+/* Faixa tracejada no topo — lembra uma fita de isolamento. */
+.userCard::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, var(--sev-high) 0 12px, transparent 12px 20px);
+  opacity: .75;
 }
-.userIcon { font-size: 28px; flex-shrink: 0; }
-.userInfo { display: flex; flex-direction: column; gap: 2px; }
-.userName { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-.userRole  { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
 
-/* Stat rows */
-.userStats { display: flex; flex-direction: column; gap: 6px; }
-.statRow   { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.statIcon  { width: 16px; text-align: center; flex-shrink: 0; }
-.statLabel { color: var(--text-secondary); flex: 1; }
-.statValue { color: var(--text-primary); font-weight: 600; }
+.userHead { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sev-high);
+  background: var(--sev-high-bg);
+  border: 1px solid color-mix(in srgb, var(--sev-high) 30%, transparent);
+}
+.userInfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.userName {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.userRole { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
 
-/* Countdown */
-.countdownWrap {
+.countdownBox {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--bg-elevated);
+  gap: 12px;
+  padding: 14px 16px;
   border-radius: 6px;
-  padding: 10px 14px;
-}
-.countdownLabel { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .06em; }
-
-.countdown {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--sev-med);
-}
-.countdown.urgent  { color: var(--sev-high); animation: blink 1s step-end infinite; }
-.countdown.expired { color: var(--text-muted); }
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.3; }
-}
-
-/* Progress */
-.progressWrap { display: flex; flex-direction: column; gap: 4px; }
-.progressBar  {
-  height: 6px;
-  background: var(--bg-elevated);
-  border-radius: 3px;
-  overflow: hidden;
+  background: var(--bg-terminal);
   border: 1px solid var(--border);
 }
+.countLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.countdown {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  color: var(--sev-med);
+}
+tbody .countdown { font-size: 14px; }
+.urgent  { color: var(--sev-high); }
+.expired { color: var(--ok); }
+
+.progressWrap { display: flex; flex-direction: column; gap: 6px; margin-top: -6px; }
+.progressBar { height: 4px; border-radius: 2px; overflow: hidden; background: var(--bg-hover); }
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, var(--sev-high) 0%, var(--sev-med) 100%);
-  border-radius: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sev-high), var(--sev-med));
   transition: width 1s linear;
 }
-.progressLabel { font-size: 10px; color: var(--text-muted); text-align: right; }
+.progressLabel { font-size: 11.5px; color: var(--text-muted); }
 
-/* Table card */
-.tableCard {}
-.tableTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  margin-bottom: 14px;
-}
+.facts { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+.facts div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.facts dt { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); }
+.facts dt svg { color: var(--text-muted); }
+.facts dd { color: var(--text-primary); font-weight: 500; }
+.failCount { color: var(--sev-high) !important; font-family: var(--font-mono); font-weight: 600; }
+
+.tableHead { padding: 18px 20px 4px; }
+.roleCell { display: inline-flex; align-items: center; gap: 6px; }

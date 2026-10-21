@@ -1,55 +1,56 @@
-.page { display: flex; flex-direction: column; }
+.page { display: flex; flex-direction: column; gap: 16px; }
 
-.detailCell {
-  max-width: 380px;
-  white-space: normal;
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.typeTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  white-space: nowrap;
-  color: var(--text-secondary);
-}
-
-/* Per-type accent colors */
-.type_SQL_INJECTION   { color: var(--sev-high); }
-.type_BRUTE_FORCE     { color: var(--sev-high); }
-.type_LATERAL_MOVEMENT{ color: var(--sev-high); }
-.type_PRIV_ESCALATION { color: var(--sev-high); }
-.type_DATA_EXPORT     { color: var(--sev-med); }
-.type_TOKEN_ENUM      { color: var(--sev-med); }
-.type_ACCOUNT_LOCKOUT { color: var(--sev-med); }
-.type_PASSWORD_SPRAY  { color: var(--sev-high); }
-.type_WEAK_HASH       { color: var(--sev-high); }
-.type_OFF_HOURS       { color: var(--sev-low); }
-.type_SHORT_TOTP      { color: var(--sev-med); }
-
-/* Barra de pentest (simular ataque) */
-.pentestBar {
+/* ── Console de simulação ────────────────────────────────────────────────── */
+.console {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 18px;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-elevated, rgba(127,127,127,0.06));
+  background: linear-gradient(90deg, var(--bg-surface) 0%, var(--bg-base) 100%);
 }
-.pentestBtns { display: flex; gap: 8px; flex-wrap: wrap; }
-.pentestHint { color: var(--text-muted); font-size: 13px; }
-.pentestResult {
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+.consoleInfo :global(.card-title) { margin-bottom: 6px; }
+.consoleInfo p { color: var(--text-secondary); font-size: 13px; }
+.consoleActions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ── Filtros ─────────────────────────────────────────────────────────────── */
+.filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.search { flex: 1; min-width: 240px; }
+
+/* ── Tabela ──────────────────────────────────────────────────────────────── */
+.sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
 }
-.resultOk  { border-color: var(--sev-high); background: rgba(220, 38, 38, 0.08); }
-.resultErr { border-color: var(--sev-med);  background: rgba(234, 179, 8, 0.10); }
+.sortBtn:hover { color: var(--text-primary); }
+.sortActive { color: var(--accent); }
+
+.typeCell { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; color: var(--text-primary); }
+.typeIcon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 24%, transparent);
+}
+.detailCell {
+  min-width: 260px;
+  max-width: 420px;
+  white-space: normal;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.tsCell { white-space: nowrap; }
